@@ -1,6 +1,6 @@
 # AGENTS.md — LingYi (灵依) Codebase Guide
 
-> **灵依 LingYi** — A private AI assistant (CLI-first). Manages schedules, memos, projects, plans, sessions, preferences, TTS/STT voice I/O, smart reminders, weekly reports, knowledge retrieval, code assistance, content digestion, mobile support, and briefing summaries. Current version: **v0.13.0**.
+> **灵依 LingYi** — A private AI assistant (CLI-first). Manages schedules, memos, projects, plans, sessions, preferences, TTS/STT voice I/O, smart reminders, weekly reports, knowledge retrieval, code assistance, content digestion, mobile support, briefing summaries, and cross-project discussions. Current version: **v0.14.0**.
 
 ---
 
@@ -35,6 +35,9 @@ lingyi ask "什么是气功"
 lingyi code "写一个排序函数"
 lingyi digest ~/notes.txt
 lingyi briefing
+lingyi msg-list
+lingyi msg-read disc_20260404021153
+lingyi msg-send --from lingyi --topic "灵字辈大家庭的未来发展方向" "我提议以知识闭环为第一优先"
 lingyi stt recording.wav
 
 # Run tests
@@ -51,7 +54,7 @@ pytest -k TestMemo              # Run specific test class
 ```
 LingYi/
 ├── src/lingyi/                  # Main package
-│   ├── __init__.py              # Version (0.13.0)
+│   ├── __init__.py              # Version (0.14.0)
 │   ├── cli.py                   # CLI entry point — Click group + command registration
 │   ├── models.py                # Dataclasses: Memo, Schedule, Project, Plan, Session
 │   ├── db.py                    # SQLite connection, schema (6 tables), get_db()
@@ -70,6 +73,7 @@ LingYi/
 │   ├── code.py                  # 灵克 LingClaude code assistance client (v0.10)
 │   ├── digest.py                # Content digestion and summarization (v0.9)
 │   ├── briefing.py              # Daily briefing aggregation (v0.13)
+│   ├── lingmessage.py           # Cross-project discussion framework (v0.14)
 │   ├── mobile.py                # Mobile device support (v0.12)
 │   └── commands/                # CLI subcommand modules (one file per domain)
 │       ├── __init__.py
@@ -83,11 +87,12 @@ LingYi/
 │       ├── connect.py           #   Ask/Code CLI commands (v0.8)
 │       ├── digest.py            #   Digest CLI commands (v0.9)
 │       ├── briefing.py          #   Briefing CLI commands (v0.13)
+│       ├── lingmessage.py       #   LingMessage CLI commands (v0.14)
 │       ├── voice.py             #   Voice I/O CLI commands (v0.11)
 │       └── mobile.py            #   Mobile CLI commands (v0.12)
 ├── tests/
 │   ├── __init__.py
-│   ├── test_basic.py            # All tests in one file (211 tests)
+│   ├── test_basic.py            # All tests in one file (243 tests)
 │   └── test_presets.json        # Test fixture presets data
 ├── docs/                        # Documentation
 │   ├── MISSION.md               # Charter, values, boundaries
@@ -95,7 +100,9 @@ LingYi/
 │   ├── DEVELOPMENT_PLAN.md      # Version roadmap (v0.1–v0.14+)
 │   ├── PRD.md                   # Product requirements
 │   ├── USER_PROFILE.md          # User profile
-│   └── AUDIT_REPORT_v0.13.md   # v0.13 audit report
+│   ├── AUDIT_REPORT_v0.13.md   # v0.13 audit report
+│   ├── LINGMESSAGE_RFC.md      # LingMessage RFC design doc (v0.14)
+│   └── LINGMESSAGE_DISCUSSIONS.md # First batch discussion summary (v0.14)
 ├── presets.example.json         # Template for user config (committed)
 ├── pyproject.toml               # Build config, dependencies, pytest config
 └── .lingflow/                   # LingFlow workspace (gitignored)
@@ -180,7 +187,7 @@ All models are `@dataclass` in `models.py` with `id: int | None = None` and time
 
 - **Single test file**: `tests/test_basic.py` contains all 211 tests
 - **Fixture `tmp_db`**: Creates temp DB via `monkeypatch` on `lingyi.db.DB_DIR` and `lingyi.db.DB_PATH`, patches `lingyi.config.PRESETS_PATH` to `tests/test_presets.json`
-- **Test categories**: Unit tests per domain (Memo, Schedule, Project, Plan, Session, Pref, TTS, STT, Chat, SmartRemind, WeeklyReport, AskKnowledge, AskCode, Digest, Briefing, Mobile, Voice) + CLI integration tests
+- **Test categories**: Unit tests per domain (Memo, Schedule, Project, Plan, Session, Pref, TTS, STT, Chat, SmartRemind, WeeklyReport, AskKnowledge, AskCode, Digest, Briefing, Mobile, Voice, LingMessage) + CLI integration tests
 - **Test data**: `tests/test_presets.json` has simplified schedule/project/patrol data
 - **Philosophy**: "核心路径有测试" — critical modules must have tests; no 100% coverage target
 
@@ -260,6 +267,14 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 ### Briefing (v0.13)
 - `lingyi briefing` aggregates: weather + schedule + tasks + project status + recent memos
 - Each external call wrapped in try/except — graceful degradation when services unavailable
+
+### LingMessage (v0.14)
+- `lingyi msg-send/msg-list/msg-read/msg-reply/msg-search/msg-close` — cross-project discussion commands
+- File-based storage at `/home/ai/.lingmessage/` (outside project DB, cross-project scope)
+- Topic-based threading: `send_message()` auto-groups messages by matching open topic
+- 9 project identities in `PROJECTS` dict — each message records `from_id` (English) and `from_name` (Chinese)
+- `list_discussions()` returns lightweight index entries; use `read_discussion()` for full thread data
+- Message IDs are timestamp-based (`msg_YYYYMMDDHHMMSS`) — not collision-proof for rapid sequential calls
 
 ---
 

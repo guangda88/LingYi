@@ -7,7 +7,8 @@
 
 ## 版本
 
-- **v0.13 情报汇总** — 每日情报聚合、多源摘要、天气/日程/任务/项目一站概览
+- **v0.14 灵信** — 跨项目讨论框架、话题式线程、9项目身份系统
+- v0.13 情报汇总 — 每日情报聚合、多源摘要、天气/日程/任务/项目一站概览
 - v0.12 移动端 — 移动设备支持、远程访问
 - v0.11 双向语音 — Whisper语音识别、语音命令
 - v0.10 编程辅助深化 — 灵克代码助手、代码审查、重构
@@ -37,6 +38,7 @@ LingYi/
 │   │   ├── chat.py          #   交互对话
 │   │   ├── connect.py       #   灵知/灵克命令
 │   │   ├── digest.py        #   信息整理命令
+│   │   ├── lingmessage.py    #   灵信讨论命令
 │   │   ├── briefing.py      #   情报汇总命令
 │   │   ├── voice.py         #   语音命令
 │   │   └── mobile.py        #   移动端命令
@@ -57,13 +59,16 @@ LingYi/
 │   ├── code.py              # 灵克编程助手
 │   ├── digest.py            # 内容摘要
 │   ├── briefing.py          # 情报聚合
+│   ├── lingmessage.py       # 灵信讨论框架
 │   └── mobile.py            # 移动端支持
-├── tests/                   # 测试（211 tests）
+├── tests/                   # 测试（243 tests）
 ├── docs/                    # 文档
 │   ├── MISSION.md           #   宪章
 │   ├── DEVELOPMENT_PRINCIPLES.md  # 开发原则
 │   ├── DEVELOPMENT_PLAN.md  #   开发规划
-│   └── AUDIT_REPORT_v0.13.md #  v0.13 审计报告
+│   ├── AUDIT_REPORT_v0.13.md #  v0.13 审计报告
+│   ├── LINGMESSAGE_RFC.md   #  灵信 RFC 设计文档
+│   └── LINGMESSAGE_DISCUSSIONS.md # 灵信首批讨论汇总
 ├── presets.example.json     # 预设模板（公开）
 └── pyproject.toml           # 项目配置
 ```
