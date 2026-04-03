@@ -9,6 +9,7 @@ from .commands import project as proj_cmds
 from .commands import plan as plan_cmds
 from .commands import session as session_cmds
 from .commands import pref as pref_cmds
+from .commands import chat as chat_cmds
 
 
 @click.group()
@@ -60,6 +61,7 @@ proj_cmds.register(project)
 plan_cmds.register(plan)
 session_cmds.register(session)
 pref_cmds.register(pref)
+chat_cmds.register(cli)
 
 
 @cli.command("patrol")

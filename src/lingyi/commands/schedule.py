@@ -4,6 +4,7 @@ import click
 from datetime import date, timedelta
 
 from .. import schedule as sched_mod
+from ..tts import speak, clean_text_for_speech
 
 
 def register(group: click.Group):
@@ -95,37 +96,51 @@ def register(group: click.Group):
             click.echo(f"日程 #{schedule_id} 不存在。")
 
     @group.command("today")
-    def schedule_today():
+    @click.option("--speak", "speak_flag", is_flag=True, help="语音播报")
+    def schedule_today(speak_flag: bool):
         """今日安排"""
-        click.echo(sched_mod.format_today())
+        output = sched_mod.format_today()
+        click.echo(output)
+        if speak_flag:
+            speak(clean_text_for_speech(output))
 
     @group.command("week")
-    def schedule_week():
+    @click.option("--speak", "speak_flag", is_flag=True, help="语音播报")
+    def schedule_week(speak_flag: bool):
         """本周一览"""
         click.echo("📅 本周排班：")
-        click.echo(sched_mod.format_week())
+        output = sched_mod.format_week()
+        click.echo(output)
+        if speak_flag:
+            speak(clean_text_for_speech(output))
 
     @group.command("remind")
-    def schedule_remind():
+    @click.option("--speak", "speak_flag", is_flag=True, help="语音播报")
+    def schedule_remind(speak_flag: bool):
         """检查今日提醒（练功/日记/门诊/灵通问道）"""
+        speech_parts = []
         practice = sched_mod.check_practice_remind()
         if practice:
             click.echo(" Qi 今天早上练功至少30分钟！")
+            speech_parts.append("今天早上练功至少30分钟")
         else:
             click.echo("今天没有练功安排。")
         click.echo()
         journal = sched_mod.check_journal_remind()
         if journal:
             click.echo("✍ 今晚11点记得写日记！")
+            speech_parts.append("今晚11点记得写日记")
         else:
             click.echo("今天没有日记提醒。")
         click.echo()
         clinics = sched_mod.check_remind()
         if clinics:
             click.echo("⚠ 今天有门诊！")
+            speech_parts.append("今天有门诊")
             for s in clinics:
                 slot_cn = sched_mod._SLOT_CN.get(s.time_slot, s.time_slot)
                 click.echo(f"  {slot_cn}  {s.description or '门诊'}")
+                speech_parts.append(f"{slot_cn}{s.description or '门诊'}")
         else:
             click.echo("今天没有门诊。")
         click.echo()
@@ -134,5 +149,8 @@ def register(group: click.Group):
         tomorrow_cn = sched_mod._DAY_CN.get(tomorrow.strftime("%A"), "")
         if tomorrow_ask:
             click.echo(f"📢 明天{tomorrow_cn}早上6点有灵通问道更新，请确认内容是否已准备好！")
+            speech_parts.append(f"明天{tomorrow_cn}早上6点有灵通问道更新")
         else:
             click.echo(f"明天{tomorrow_cn}没有灵通问道更新。")
+        if speak_flag and speech_parts:
+            speak(clean_text_for_speech("。".join(speech_parts)))

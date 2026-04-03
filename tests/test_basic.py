@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.5.0"
+        assert __version__ == "0.6.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.5.0" in r.output
+        assert "0.6.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -987,3 +987,64 @@ class TestPref:
         assert "✓" in r.output
         r2 = runner.invoke(cli, ["pref", "delete", "nonexistent"])
         assert "不存在" in r2.output
+
+
+# ── v0.6 语音：TTS ────────────────────────────────
+
+class TestTTS:
+    def test_clean_text(self):
+        from lingyi.tts import clean_text_for_speech
+        assert clean_text_for_speech("") == ""
+        assert "完成" in clean_text_for_speech("✓ 完成")
+        assert clean_text_for_speech("## 标题") == "标题"
+        assert clean_text_for_speech("  多   空  格  ") == "多 空 格"
+
+    def test_speak_empty(self):
+        from lingyi.tts import speak
+        assert speak("") is False
+
+    def test_speak_no_player(self, monkeypatch):
+        import subprocess
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw: (_ for _ in ()).throw(FileNotFoundError("no player")))
+        from lingyi.tts import speak
+        assert speak("测试") is False
+
+    def test_synthesize_to_file(self, tmp_path):
+        from lingyi.tts import synthesize_to_file
+        out = str(tmp_path / "test.mp3")
+        result = synthesize_to_file("测试语音", out)
+        import os
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+
+# ── v0.6 语音：chat ──────────────────────────────
+
+class TestChat:
+    def test_process_input_memo(self, tmp_db):
+        from lingyi.commands.chat import _process_input
+        result = _process_input("备忘买牛奶")
+        assert "已记录" in result
+        assert "买牛奶" in result
+
+    def test_process_input_schedule(self, tmp_db):
+        from lingyi.commands.chat import _process_input
+        result = _process_input("今天有什么安排")
+        assert isinstance(result, str)
+
+    def test_process_input_help(self, tmp_db):
+        from lingyi.commands.chat import _process_input
+        result = _process_input("你能做什么")
+        assert "日程" in result or "备忘" in result
+
+    def test_process_input_echo(self, tmp_db):
+        from lingyi.commands.chat import _process_input
+        result = _process_input("随便说点什么")
+        assert "收到" in result
+
+    def test_chat_cli_quit(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["chat"], input="q\n")
+        assert "再见" in r.output
