@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from lingyi.db import get_db
-from lingyi.models import Memo, Schedule, Project
+from lingyi.models import Memo, Schedule, Project, Plan
 
 
 _TEST_PRESETS = Path(__file__).parent / "test_presets.json"
@@ -320,3 +320,164 @@ class TestProject:
         assert "LingFlow" in r.output
         r = runner.invoke(cli, ["project", "show", "不存在"])
         assert "不存在" in r.output
+
+
+# ── v0.4 计划 ──────────────────────────────────────────
+
+class TestPlan:
+    def test_add_plan(self, tmp_db):
+        from lingyi.plan import add_plan
+        p = add_plan("灵知系统安全加固", area="编程", project="灵知", due_date="2026-04-10")
+        assert p.id == 1
+        assert p.content == "灵知系统安全加固"
+        assert p.area == "编程"
+        assert p.project == "灵知"
+        assert p.due_date == "2026-04-10"
+        assert p.status == "todo"
+        assert p.created_at
+
+    def test_add_plan_defaults(self, tmp_db):
+        from lingyi.plan import add_plan
+        p = add_plan("撰写AI+中医论文大纲")
+        assert p.area == "编程"
+        assert p.project == ""
+        assert p.status == "todo"
+
+    def test_list_plans(self, tmp_db):
+        from lingyi.plan import add_plan, list_plans
+        add_plan("任务A", area="编程")
+        add_plan("任务B", area="论文")
+        add_plan("任务C", area="编程")
+        all_plans = list_plans()
+        assert len(all_plans) == 3
+
+    def test_list_plans_by_area(self, tmp_db):
+        from lingyi.plan import add_plan, list_plans
+        add_plan("任务A", area="编程")
+        add_plan("任务B", area="论文")
+        add_plan("任务C", area="编程")
+        code_plans = list_plans(area="编程")
+        assert len(code_plans) == 2
+        assert all(p.area == "编程" for p in code_plans)
+
+    def test_list_plans_by_status(self, tmp_db):
+        from lingyi.plan import add_plan, list_plans, done_plan
+        add_plan("待办A")
+        add_plan("待办B")
+        p3 = add_plan("要完成的")
+        done_plan(p3.id)
+        todo_plans = list_plans(status="todo")
+        assert len(todo_plans) == 2
+        done_plans = list_plans(status="done")
+        assert len(done_plans) == 1
+
+    def test_list_plans_by_project(self, tmp_db):
+        from lingyi.plan import add_plan, list_plans
+        add_plan("任务A", project="灵知")
+        add_plan("任务B", project="LingFlow")
+        add_plan("任务C", project="灵知")
+        plans = list_plans(project="灵知")
+        assert len(plans) == 2
+
+    def test_show_plan(self, tmp_db):
+        from lingyi.plan import add_plan, show_plan
+        p = add_plan("可查的计划", area="研究")
+        found = show_plan(p.id)
+        assert found.content == "可查的计划"
+        assert found.area == "研究"
+        assert show_plan(999) is None
+
+    def test_done_plan(self, tmp_db):
+        from lingyi.plan import add_plan, done_plan, show_plan
+        p = add_plan("要完成的任务")
+        result = done_plan(p.id)
+        assert result.status == "done"
+        assert show_plan(p.id).status == "done"
+
+    def test_done_plan_not_found(self, tmp_db):
+        from lingyi.plan import done_plan
+        assert done_plan(999) is None
+
+    def test_cancel_plan(self, tmp_db):
+        from lingyi.plan import add_plan, cancel_plan, show_plan
+        p = add_plan("要取消的任务")
+        assert cancel_plan(p.id) is True
+        assert show_plan(p.id).status == "cancel"
+
+    def test_cancel_plan_not_found(self, tmp_db):
+        from lingyi.plan import cancel_plan
+        assert cancel_plan(999) is False
+
+    def test_plan_stats(self, tmp_db):
+        from lingyi.plan import add_plan, done_plan, cancel_plan, plan_stats
+        add_plan("编程A", area="编程")
+        add_plan("编程B", area="编程")
+        p = add_plan("编程C", area="编程")
+        done_plan(p.id)
+        add_plan("论文A", area="论文")
+        q = add_plan("论文B", area="论文")
+        cancel_plan(q.id)
+        stats = plan_stats()
+        assert stats["编程"]["todo"] == 2
+        assert stats["编程"]["done"] == 1
+        assert stats["论文"]["todo"] == 1
+        assert stats["论文"]["cancel"] == 1
+
+    def test_format_plan_short(self, tmp_db):
+        from lingyi.plan import add_plan, format_plan_short
+        p = add_plan("测试任务", area="编程", project="灵知")
+        text = format_plan_short(p)
+        assert "[1]" in text
+        assert "[编程]" in text
+        assert "测试任务" in text
+        assert "@灵知" in text
+        assert "待办" in text
+
+    def test_format_plan_detail(self, tmp_db):
+        from lingyi.plan import add_plan, format_plan_detail
+        p = add_plan("详细任务", area="研究", due_date="2026-04-10", notes="重要")
+        text = format_plan_detail(p)
+        assert "详细任务" in text
+        assert "研究" in text
+        assert "2026-04-10" in text
+        assert "重要" in text
+
+    def test_format_plan_week(self, tmp_db):
+        from lingyi.plan import add_plan, format_plan_week
+        text = format_plan_week()
+        assert "没有计划" in text
+
+    def test_format_plan_stats(self, tmp_db):
+        from lingyi.plan import format_plan_stats
+        text = format_plan_stats()
+        assert "暂无" in text
+
+    def test_format_plan_stats_with_data(self, tmp_db):
+        from lingyi.plan import add_plan, done_plan, format_plan_stats
+        add_plan("编程A", area="编程")
+        p = add_plan("编程B", area="编程")
+        done_plan(p.id)
+        text = format_plan_stats()
+        assert "编程" in text
+        assert "50%" in text
+
+    def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_plan.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["plan", "add", "测试计划", "--area", "编程"])
+        assert r.exit_code == 0
+        assert "已添加" in r.output
+        r = runner.invoke(cli, ["plan", "list"])
+        assert "测试计划" in r.output
+        r = runner.invoke(cli, ["plan", "show", "1"])
+        assert "测试计划" in r.output
+        r = runner.invoke(cli, ["plan", "done", "1"])
+        assert "已完成" in r.output
+        r = runner.invoke(cli, ["plan", "stats"])
+        assert "编程" in r.output
+        r = runner.invoke(cli, ["plan", "week"])
+        assert "本周计划" in r.output

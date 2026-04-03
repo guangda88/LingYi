@@ -7,6 +7,7 @@ from . import __version__, patrol as patrol_mod
 from . import memo as memo_mod
 from . import schedule as sched_mod
 from . import project as proj_mod
+from . import plan as plan_mod
 
 
 @click.group()
@@ -183,7 +184,7 @@ def schedule_week():
 
 @schedule.command("remind")
 def schedule_remind():
-    """检查今日提醒（练功/门诊/日记/灵通问道）"""
+    """检查今日提醒（练功/日记/门诊/灵通问道）"""
     practice = sched_mod.check_practice_remind()
     if practice:
         click.echo(" Qi 今天早上练功至少30分钟！")
@@ -224,9 +225,12 @@ def project():
 
 @project.command("init")
 def project_init():
-    """导入14个项目"""
+    """导入项目"""
     items = proj_mod.init_projects()
-    click.echo(f"✓ 已导入 {len(items)} 个项目")
+    if not items:
+        click.echo("没有可导入的项目（检查 ~/.lingyi/presets.json）")
+    else:
+        click.echo(f"✓ 已导入 {len(items)} 个项目")
 
 
 @project.command("list")
@@ -306,6 +310,86 @@ def project_update(name: str, alias: str | None, status: str | None, priority: s
         click.echo(f"项目「{name}」不存在。")
         return
     click.echo(f"✓ 已更新「{p.name}」")
+
+
+# ── plan ──────────────────────────────────────────────
+
+@cli.group("plan")
+def plan():
+    """工作计划"""
+    pass
+
+
+@plan.command("add")
+@click.argument("content")
+@click.option("--area", default="编程", help="领域：医疗/编程/研究/论文/学术")
+@click.option("--project", "proj", default="", help="关联项目")
+@click.option("--due", default="", help="截止日期 YYYY-MM-DD")
+@click.option("--notes", default="", help="备注")
+def plan_add(content: str, area: str, proj: str, due: str, notes: str):
+    """添加计划"""
+    p = plan_mod.add_plan(content, area=area, project=proj, due_date=due, notes=notes)
+    click.echo(f"✓ 计划 #{p.id} 已添加")
+
+
+@plan.command("list")
+@click.option("--area", default=None, help="按领域筛选")
+@click.option("--status", default=None, help="按状态筛选：todo/done/cancel")
+@click.option("--project", default=None, help="按项目筛选")
+def plan_list(area: str | None, status: str | None, project: str | None):
+    """查看计划列表"""
+    items = plan_mod.list_plans(area=area, status=status, project=project)
+    if not items:
+        click.echo("暂无计划。")
+        return
+    for p in items:
+        click.echo(plan_mod.format_plan_short(p))
+
+
+@plan.command("show")
+@click.argument("plan_id", type=int)
+def plan_show(plan_id: int):
+    """查看计划详情"""
+    p = plan_mod.show_plan(plan_id)
+    if not p:
+        click.echo(f"计划 #{plan_id} 不存在。")
+        return
+    click.echo(plan_mod.format_plan_detail(p))
+
+
+@plan.command("done")
+@click.argument("plan_id", type=int)
+def plan_done(plan_id: int):
+    """完成任务"""
+    p = plan_mod.done_plan(plan_id)
+    if not p:
+        click.echo(f"计划 #{plan_id} 不存在。")
+        return
+    click.echo(f"✓ 计划 #{plan_id}「{p.content}」已完成")
+
+
+@plan.command("cancel")
+@click.argument("plan_id", type=int)
+def plan_cancel(plan_id: int):
+    """取消任务"""
+    if plan_mod.cancel_plan(plan_id):
+        click.echo(f"✓ 计划 #{plan_id} 已取消")
+    else:
+        click.echo(f"计划 #{plan_id} 不存在。")
+
+
+@plan.command("week")
+def plan_week():
+    """本周计划"""
+    click.echo("📋 本周计划：")
+    click.echo(plan_mod.format_plan_week())
+
+
+@plan.command("stats")
+def plan_stats():
+    """完成率统计"""
+    click.echo("📊 各领域完成率：")
+    click.echo(plan_mod.format_plan_stats())
 
 
 # ── patrol ───────────────────────────────────────────

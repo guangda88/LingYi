@@ -1,7 +1,6 @@
 """数据模型。"""
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 
 
 @dataclass
@@ -40,6 +39,19 @@ class Project:
     repo: str = ""
     version: str = ""
     energy_pct: int = 0
+    notes: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass
+class Plan:
+    id: int | None = None
+    content: str = ""
+    area: str = "编程"
+    project: str = ""
+    status: str = "todo"
+    due_date: str = ""
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
