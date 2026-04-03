@@ -13,12 +13,12 @@ _DAY_CN = {
 _SLOT_CN = {"morning": "上午", "afternoon": "下午", "evening": "晚上"}
 
 _DEFAULT_CLINIC = [
-    ("Monday", "afternoon"),
-    ("Tuesday", "morning"),
-    ("Wednesday", "afternoon"),
-    ("Thursday", "morning"),
-    ("Friday", "afternoon"),
-    ("Saturday", "morning"),
+    ("Tuesday", "morning", "泰安八十八医院"),
+    ("Tuesday", "afternoon", "禾康中医医院"),
+    ("Wednesday", "morning", "岱岳区第二人民医院"),
+    ("Wednesday", "afternoon", "镜医堂中西医结合门诊"),
+    ("Thursday", "morning", "泰安八十八医院"),
+    ("Thursday", "afternoon", "禾康中医医院"),
 ]
 
 
@@ -28,10 +28,10 @@ def init_clinic() -> list[Schedule]:
     if existing:
         conn.close()
         return list_schedules(schedule_type="clinic")
-    for day, slot in _DEFAULT_CLINIC:
+    for day, slot, desc in _DEFAULT_CLINIC:
         conn.execute(
             "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
-            ("clinic", day, slot, "门诊"),
+            ("clinic", day, slot, desc),
         )
     conn.commit()
     result = list_schedules(schedule_type="clinic")
@@ -159,7 +159,7 @@ def format_today() -> str:
     for s in items:
         slot_cn = _SLOT_CN.get(s.time_slot, s.time_slot)
         desc = f" {s.description}" if s.description else ""
-        lines.append(f"  {slot_cn}  {s.type}{desc}")
+        lines.append(f"  {slot_cn}  {s.type}  {desc.strip()}" if s.description else f"  {slot_cn}  {s.type}")
     return "\n".join(lines)
 
 
@@ -175,11 +175,12 @@ def format_week() -> str:
         marker = " ←今天" if d == today else ""
         items = data.get(day_name, [])
         if items:
-            slots = ", ".join(
-                f"{_SLOT_CN.get(s.time_slot, s.time_slot)} {s.type}"
-                for s in items
-            )
-            lines.append(f"  {day_cn}（{d.strftime('%m-%d')}）{marker}: {slots}")
+            parts = []
+            for s in items:
+                slot_cn = _SLOT_CN.get(s.time_slot, s.time_slot)
+                d_str = f"{s.description}" if s.description else s.type
+                parts.append(f"{slot_cn} {d_str}")
+            lines.append(f"  {day_cn}（{d.strftime('%m-%d')}）{marker}: {', '.join(parts)}")
         else:
             lines.append(f"  {day_cn}（{d.strftime('%m-%d')}）{marker}: —")
     return "\n".join(lines)

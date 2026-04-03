@@ -119,13 +119,8 @@ class TestSchedule:
         init_clinic()
         clinics = check_remind()
         today_name = date.today().strftime("%A")
-        expected = [
-            ("Monday", "afternoon"), ("Tuesday", "morning"),
-            ("Wednesday", "afternoon"), ("Thursday", "morning"),
-            ("Friday", "afternoon"), ("Saturday", "morning"),
-        ]
-        has_clinic_today = any(d == today_name for d, _ in expected)
-        if has_clinic_today:
+        clinic_days = ["Tuesday", "Wednesday", "Thursday"]
+        if today_name in clinic_days:
             assert len(clinics) > 0
         else:
             assert len(clinics) == 0
