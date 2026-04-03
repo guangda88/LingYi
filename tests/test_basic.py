@@ -205,7 +205,7 @@ class TestProject:
         assert len(items) == 14
         names = [p.name for p in items]
         assert "LingFlow" in names
-        assert "灵知系统" in names
+        assert "LingZhi" in names
 
     def test_init_projects_idempotent(self, tmp_db):
         from lingyi.project import init_projects
@@ -268,7 +268,7 @@ class TestProject:
         assert p is not None
         assert p.priority == "P0"
         assert p.notes == "重要"
-        p2 = show_project("灵知系统")
+        p2 = show_project("LingZhi")
         assert p2.priority == "P0"
 
     def test_update_project_not_found(self, tmp_db):
@@ -524,7 +524,7 @@ class TestConfig:
         from lingyi.config import load_patrol_paths
         paths = load_patrol_paths()
         assert "灵依 LingYi" in paths
-        assert paths["灵依 LingYi"] == "/home/ai/LingYi"
+        assert paths["灵依 LingYi"] == "/home/user/LingYi"
 
 
 # ── patrol 测试 ──────────────────────────────────────
@@ -1912,3 +1912,37 @@ class TestBriefingCLI:
         assert r.exit_code == 0
         assert "灵知" in r.output
         assert "42" in r.output
+
+
+class TestDbDirect:
+    def test_get_db_creates_tables(self, tmp_db):
+        from lingyi.db import get_db
+        conn = get_db()
+        tables = [row["name"] for row in
+                  conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
+        conn.close()
+        for t in ["memos", "schedules", "projects", "plans", "sessions", "preferences"]:
+            assert t in tables
+
+    def test_get_db_wal_mode(self, tmp_db):
+        from lingyi.db import get_db
+        conn = get_db()
+        mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        conn.close()
+        assert mode == "wal"
+
+    def test_get_db_row_factory(self, tmp_db):
+        from lingyi.db import get_db
+        conn = get_db()
+        assert conn.row_factory is not None
+        conn.close()
+
+    def test_schema_idempotent(self, tmp_db):
+        from lingyi.db import get_db
+        conn1 = get_db()
+        conn1.close()
+        conn2 = get_db()
+        tables = [row["name"] for row in
+                  conn2.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
+        conn2.close()
+        assert tables.count("memos") == 1

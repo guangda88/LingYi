@@ -1,4 +1,24 @@
-"""情报汇总 — 从灵通/灵知/灵克收集情报，整理汇报。"""
+"""情报汇总 — 从灵通/灵知/灵克/灵通问道收集情报，整理汇报。
+
+灵字辈项目情报闭环:
+┌─────────────┐     文件系统/API      ┌─────────────┐
+│  LingFlow   │ ────────────────────→ │   LingYi    │
+│  (灵通)     │   .lingflow/          │   (灵依)    │
+│  工程流     │                        │  情报中心  │
+├─────────────┤                        ├─────────────┤
+│  LingZhi    │ ── HTTP localhost:80─→ │   LingYi    │
+│  (灵知)     │      00/               │   (灵依)    │
+│  知识库     │                        │  情报中心  │
+├─────────────┤                        ├─────────────┤
+│  LingClaude │ ── session_history.js─→ │   LingYi    │
+│  (灵克)     │       on              │   (灵依)    │
+│  代码助手   │                        │  情报中心  │
+├─────────────┤                        ├─────────────┤
+│ LingTongAsk │ ── fan_engagement/     │   LingYi    │
+│ (灵通问道) │      reports/*.json ──→ │   (灵依)    │
+│  内容平台   │                        │  情报中心  │
+└─────────────┘                        └─────────────┘
+"""
 
 import json
 import logging
@@ -11,6 +31,7 @@ logger = logging.getLogger(__name__)
 _LINGFLOW_PATH = Path("/home/ai/LingFlow")
 _LINGZHI_URL = "http://localhost:8000"
 _LINGCLAUDE_PATH = Path("/home/ai/LingClaude")
+_LINGTONGASK_PATH = Path("/home/ai/lingtongask")
 
 
 def collect_lingzhi() -> dict:
@@ -93,6 +114,67 @@ def collect_lingclaude() -> dict:
     return result
 
 
+def collect_lingtongask() -> dict:
+    """收集灵通问道情报（粉丝互动数据）。"""
+    result = {
+        "available": True,
+        "total_comments": 0,
+        "total_messages": 0,
+        "unique_users": 0,
+        "sentiment": {"positive": 0, "neutral": 0, "negative": 0, "average": 0},
+        "platforms": {},
+        "top_fans": [],
+        "latest_report": None
+    }
+
+    # 读取最新的粉丝互动报告
+    report_dir = _LINGTONGASK_PATH / "data" / "fan_engagement" / "reports"
+    if not report_dir.exists():
+        result["available"] = False
+        return result
+
+    try:
+        # 获取最新的报告文件
+        reports = sorted(report_dir.glob("report_*.json"), reverse=True)
+        if not reports:
+            result["available"] = False
+            return result
+
+        latest_report = reports[0]
+        result["latest_report"] = latest_report.name
+
+        data = json.loads(latest_report.read_text(encoding="utf-8"))
+
+        # 统计数据
+        stats = data.get("stats", {})
+        result["total_comments"] = stats.get("total_comments", 0)
+        result["total_messages"] = stats.get("total_messages", 0)
+        result["unique_users"] = stats.get("unique_users", 0)
+
+        # 情感分析
+        sentiment = data.get("sentiment", {})
+        dist = sentiment.get("distribution", {})
+        result["sentiment"] = {
+            "positive": dist.get("positive", 0),
+            "neutral": dist.get("neutral", 0),
+            "negative": dist.get("negative", 0),
+            "average": sentiment.get("average", 0)
+        }
+
+        # 平台分布
+        result["platforms"] = data.get("platforms", {})
+
+        # 顶级粉丝
+        result["top_fans"] = data.get("top_fans", [])[:5]
+
+    except Exception as e:
+        logger.debug(f"灵通问道收集失败: {e}")
+        result["available"] = False
+        result["error"] = str(e)
+
+    return result
+
+
 def collect_all() -> dict:
     """收集全部情报。"""
     return {
@@ -100,6 +182,7 @@ def collect_all() -> dict:
         "lingzhi": collect_lingzhi(),
         "lingflow": collect_lingflow(),
         "lingclaude": collect_lingclaude(),
+        "lingtongask": collect_lingtongask(),
     }
 
 
@@ -149,6 +232,38 @@ def format_briefing(data: dict, compact: bool = False) -> str:
     else:
         lines.append(f"\n💻 灵克编程助手: 不可用")
 
+    lingtongask = data.get("lingtongask", {})
+    if lingtongask.get("available"):
+        lines.append(f"\n🎙️ 灵通问道")
+        total_comments = lingtongask.get("total_comments", 0)
+        total_messages = lingtongask.get("total_messages", 0)
+        unique_users = lingtongask.get("unique_users", 0)
+        lines.append(f"  评论: {total_comments} 条  私信: {total_messages} 条  粉丝: {unique_users} 人")
+
+        sentiment = lingtongask.get("sentiment", {})
+        positive = sentiment.get("positive", 0)
+        neutral = sentiment.get("neutral", 0)
+        negative = sentiment.get("negative", 0)
+        total_sentiment = positive + neutral + negative
+        if total_sentiment > 0:
+            lines.append(f"  情感: 积极 {positive} 中性 {neutral} 消极 {negative}")
+
+        platforms = lingtongask.get("platforms", {})
+        if platforms:
+            platform_names = {
+                "wechat": "微信", "bilibili": "B站", "douyin": "抖音",
+                "xiaohongshu": "小红书", "ximalaya": "喜马拉雅", "podcast": "播客"
+            }
+            platform_list = [f"{platform_names.get(k, k)}{v}" for k, v in platforms.items() if v > 0]
+            if platform_list:
+                lines.append(f"  平台: {' '.join(platform_list)}")
+
+        top_fans = lingtongask.get("top_fans", [])
+        if top_fans:
+            lines.append(f"  活跃粉丝: {', '.join([f.get('name', '未知') for f in top_fans[:3]])}")
+    else:
+        lines.append(f"\n🎙️ 灵通问道: 不可用")
+
     return "\n".join(lines)
 
 
@@ -173,5 +288,13 @@ def format_briefing_short(data: dict) -> str:
         parts.append(f"灵克:{lingclaude.get('sessions', 0)}会话")
     else:
         parts.append("灵克:离线")
+
+    lingtongask = data.get("lingtongask", {})
+    if lingtongask.get("available"):
+        comments = lingtongask.get("total_comments", 0)
+        users = lingtongask.get("unique_users", 0)
+        parts.append(f"问道:{comments}评论{users}粉")
+    else:
+        parts.append("问道:离线")
 
     return " | ".join(parts)

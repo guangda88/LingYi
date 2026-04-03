@@ -123,8 +123,6 @@ def register(group: click.Group):
             output = sched_mod.smart_remind()
             click.echo(output)
             if speak_flag:
-                from ..tts import clean_text_for_speech
-                from ..tts import speak
                 speak(clean_text_for_speech(output))
             return
 
