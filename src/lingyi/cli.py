@@ -3,7 +3,7 @@
 import click
 from datetime import date, timedelta
 
-from . import __version__
+from . import __version__, patrol as patrol_mod
 from . import memo as memo_mod
 from . import schedule as sched_mod
 
@@ -193,6 +193,14 @@ def schedule_remind():
         click.echo(f"📢 明天{tomorrow_cn}早上6点有灵通问道更新，请确认内容是否已准备好！")
     else:
         click.echo(f"明天{tomorrow_cn}没有灵通问道更新。")
+
+
+# ── patrol ───────────────────────────────────────────
+
+@cli.command("patrol")
+def do_patrol():
+    """巡检所有项目变化"""
+    click.echo(patrol_mod.generate_report())
 
 
 if __name__ == "__main__":
