@@ -21,6 +21,14 @@ _DEFAULT_CLINIC = [
     ("Thursday", "afternoon", "禾康中医医院"),
 ]
 
+_DEFAULT_ASK = [
+    ("Monday", "morning", "灵通问道频道更新 06:00"),
+    ("Tuesday", "morning", "灵通问道频道更新 06:00"),
+    ("Wednesday", "morning", "灵通问道频道更新 06:00"),
+    ("Thursday", "morning", "灵通问道频道更新 06:00"),
+    ("Friday", "morning", "灵通问道频道更新 06:00"),
+]
+
 
 def init_clinic() -> list[Schedule]:
     conn = get_db()
@@ -137,9 +145,38 @@ def today_schedules_for(day_name: str) -> list[Schedule]:
     return [Schedule(**dict(r)) for r in rows]
 
 
+def init_ask() -> list[Schedule]:
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM schedules WHERE type = 'ask'").fetchone()
+    if existing:
+        conn.close()
+        return list_schedules(schedule_type="ask")
+    for day, slot, desc in _DEFAULT_ASK:
+        conn.execute(
+            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
+            ("ask", day, slot, desc),
+        )
+    conn.commit()
+    result = list_schedules(schedule_type="ask")
+    conn.close()
+    return result
+
+
 def check_remind() -> list[Schedule]:
     items = today_schedules()
     return [s for s in items if s.type == "clinic"]
+
+
+def check_tomorrow_ask() -> list[Schedule]:
+    tomorrow = date.today() + timedelta(days=1)
+    tomorrow_name = tomorrow.strftime("%A")
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM schedules WHERE day = ? AND type = 'ask' AND is_active = 1",
+        (tomorrow_name,),
+    ).fetchall()
+    conn.close()
+    return [Schedule(**dict(r)) for r in rows]
 
 
 def format_schedule(s: Schedule) -> str:

@@ -1,6 +1,7 @@
 """灵依 LingYi CLI 入口。"""
 
 import click
+from datetime import date, timedelta
 
 from . import __version__
 from . import memo as memo_mod
@@ -76,12 +77,15 @@ def schedule():
 @schedule.command("init")
 @click.argument("preset", default="clinic")
 def schedule_init(preset: str):
-    """初始化排班（默认 clinic）"""
+    """初始化排班（clinic/ask）"""
     if preset == "clinic":
         items = sched_mod.init_clinic()
         click.echo(f"✓ 门诊排班已初始化（{len(items)}个时段）")
+    elif preset == "ask":
+        items = sched_mod.init_ask()
+        click.echo(f"✓ 灵通问道排班已初始化（{len(items)}个时段）")
     else:
-        click.echo(f"未知预设：{preset}")
+        click.echo(f"未知预设：{preset}（可用：clinic, ask）")
 
 
 @schedule.command("add")
@@ -172,15 +176,23 @@ def schedule_week():
 
 @schedule.command("remind")
 def schedule_remind():
-    """检查今日是否有门诊"""
+    """检查今日门诊 + 明日灵通问道"""
     clinics = sched_mod.check_remind()
-    if not clinics:
+    if clinics:
+        click.echo("⚠ 今天有门诊！")
+        for s in clinics:
+            slot_cn = sched_mod._SLOT_CN.get(s.time_slot, s.time_slot)
+            click.echo(f"  {slot_cn}  {s.description or '门诊'}")
+    else:
         click.echo("今天没有门诊。")
-        return
-    click.echo(f"⚠ 今天有门诊！")
-    for s in clinics:
-        slot_cn = sched_mod._SLOT_CN.get(s.time_slot, s.time_slot)
-        click.echo(f"  {slot_cn}  {s.description or '门诊'}")
+    click.echo()
+    tomorrow_ask = sched_mod.check_tomorrow_ask()
+    tomorrow = date.today() + timedelta(days=1)
+    tomorrow_cn = sched_mod._DAY_CN.get(tomorrow.strftime("%A"), "")
+    if tomorrow_ask:
+        click.echo(f"📢 明天{tomorrow_cn}早上6点有灵通问道更新，请确认内容是否已准备好！")
+    else:
+        click.echo(f"明天{tomorrow_cn}没有灵通问道更新。")
 
 
 if __name__ == "__main__":
