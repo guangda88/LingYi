@@ -55,3 +55,14 @@ class Plan:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+
+
+@dataclass
+class Session:
+    id: int | None = None
+    summary: str = ""
+    files: str = ""
+    decisions: str = ""
+    todos: str = ""
+    prefs_noted: str = ""
+    created_at: str = ""

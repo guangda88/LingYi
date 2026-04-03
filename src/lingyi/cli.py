@@ -7,6 +7,8 @@ from .commands import memo as memo_cmds
 from .commands import schedule as sched_cmds
 from .commands import project as proj_cmds
 from .commands import plan as plan_cmds
+from .commands import session as session_cmds
+from .commands import pref as pref_cmds
 
 
 @click.group()
@@ -40,10 +42,24 @@ def plan():
     pass
 
 
+@cli.group("session")
+def session():
+    """会话记忆"""
+    pass
+
+
+@cli.group("pref")
+def pref():
+    """偏好设置"""
+    pass
+
+
 memo_cmds.register(memo)
 sched_cmds.register(schedule)
 proj_cmds.register(project)
 plan_cmds.register(plan)
+session_cmds.register(session)
+pref_cmds.register(pref)
 
 
 @cli.command("patrol")

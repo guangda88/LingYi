@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from lingyi.db import get_db
-from lingyi.models import Memo, Schedule, Project, Plan
+from lingyi.models import Memo, Schedule, Project, Plan, Session
 
 
 _TEST_PRESETS = Path(__file__).parent / "test_presets.json"
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.4.0"
+        assert __version__ == "0.5.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,4 +789,201 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.4.0" in r.output
+        assert "0.5.0" in r.output
+
+
+# ── v0.5 记忆：会话 ────────────────────────────────
+
+class TestSession:
+    def test_save_and_get(self, tmp_db):
+        from lingyi.session import save_session, get_session
+        s = save_session(summary="完成v0.5", files="session.py,pref.py",
+                         decisions="用SQLite存会话", todos="v0.6语音", prefs_noted="节约token")
+        assert s.id is not None
+        assert s.summary == "完成v0.5"
+        got = get_session(s.id)
+        assert got is not None
+        assert got.summary == "完成v0.5"
+
+    def test_last_session(self, tmp_db):
+        from lingyi.session import save_session, last_session
+        save_session(summary="第一轮")
+        save_session(summary="第二轮")
+        s = last_session()
+        assert s is not None
+        assert s.summary == "第二轮"
+
+    def test_last_session_empty(self, tmp_db):
+        from lingyi.session import last_session
+        assert last_session() is None
+
+    def test_list_sessions(self, tmp_db):
+        from lingyi.session import save_session, list_sessions
+        for i in range(5):
+            save_session(summary=f"会话{i}")
+        sessions = list_sessions(limit=3)
+        assert len(sessions) == 3
+        assert sessions[0].summary == "会话4"
+
+    def test_delete_session(self, tmp_db):
+        from lingyi.session import save_session, delete_session, get_session
+        s = save_session(summary="待删除")
+        assert delete_session(s.id) is True
+        assert get_session(s.id) is None
+        assert delete_session(999) is False
+
+    def test_format_session_detail(self, tmp_db):
+        from lingyi.session import save_session, format_session_detail
+        s = save_session(summary="测试", files="a.py", decisions="用Click", todos="下一步", prefs_noted="简洁")
+        out = format_session_detail(s)
+        assert "测试" in out
+        assert "a.py" in out
+
+    def test_format_session_resume(self, tmp_db):
+        from lingyi.session import save_session, format_session_resume
+        s = save_session(summary="v0.5记忆", decisions="SQLite", todos="v0.6")
+        out = format_session_resume(s)
+        assert "# 上次会话摘要" in out
+        assert "v0.5记忆" in out
+
+    def test_session_cli_save(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["session", "save", "--summary", "测试会话", "--files", "a.py"])
+        assert "✓" in r.output
+
+    def test_session_cli_save_empty(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["session", "save"])
+        assert "至少提供" in r.output
+
+    def test_session_cli_last_empty(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["session", "last"])
+        assert "暂无" in r.output
+
+    def test_session_cli_last_and_resume(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["session", "save", "--summary", "v0.5完成", "--todos", "v0.6"])
+        r_last = runner.invoke(cli, ["session", "last"])
+        assert "v0.5完成" in r_last.output
+        r_resume = runner.invoke(cli, ["session", "resume"])
+        assert "# 上次会话摘要" in r_resume.output
+
+    def test_session_cli_list(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["session", "save", "--summary", "第一轮"])
+        runner.invoke(cli, ["session", "save", "--summary", "第二轮"])
+        r = runner.invoke(cli, ["session", "list"])
+        assert "第二轮" in r.output
+
+    def test_session_cli_show(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["session", "save", "--summary", "展示这个"])
+        r = runner.invoke(cli, ["session", "show", "1"])
+        assert "展示这个" in r.output
+        r2 = runner.invoke(cli, ["session", "show", "999"])
+        assert "不存在" in r2.output
+
+    def test_session_cli_delete(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["session", "save", "--summary", "删除我"])
+        r = runner.invoke(cli, ["session", "delete", "1"])
+        assert "✓" in r.output
+        r2 = runner.invoke(cli, ["session", "delete", "999"])
+        assert "不存在" in r2.output
+
+
+# ── v0.5 记忆：偏好 ────────────────────────────────
+
+class TestPref:
+    def test_set_and_get(self, tmp_db):
+        from lingyi.pref import set_pref, get_pref
+        set_pref("token_economy", "extreme")
+        assert get_pref("token_economy") == "extreme"
+        assert get_pref("nonexistent") is None
+
+    def test_set_overwrites(self, tmp_db):
+        from lingyi.pref import set_pref, get_pref
+        set_pref("lang", "zh")
+        set_pref("lang", "en")
+        assert get_pref("lang") == "en"
+
+    def test_list_prefs(self, tmp_db):
+        from lingyi.pref import set_pref, list_prefs
+        set_pref("a", "1")
+        set_pref("b", "2")
+        prefs = list_prefs()
+        assert len(prefs) == 2
+        assert prefs[0][0] == "a"
+
+    def test_list_prefs_empty(self, tmp_db):
+        from lingyi.pref import list_prefs
+        assert list_prefs() == []
+
+    def test_delete_pref(self, tmp_db):
+        from lingyi.pref import set_pref, delete_pref, get_pref
+        set_pref("temp", "val")
+        assert delete_pref("temp") is True
+        assert get_pref("temp") is None
+        assert delete_pref("nonexistent") is False
+
+    def test_format_pref_list(self, tmp_db):
+        from lingyi.pref import format_pref_list
+        assert "暂无" in format_pref_list([])
+        assert "key = val" in format_pref_list([("key", "val")])
+
+    def test_pref_cli_set_get(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["pref", "set", "style", "concise"])
+        assert "✓" in r.output
+        r2 = runner.invoke(cli, ["pref", "get", "style"])
+        assert "concise" in r2.output
+
+    def test_pref_cli_get_missing(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["pref", "get", "missing"])
+        assert "不存在" in r.output
+
+    def test_pref_cli_list(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["pref", "set", "a", "1"])
+        runner.invoke(cli, ["pref", "set", "b", "2"])
+        r = runner.invoke(cli, ["pref", "list"])
+        assert "a = 1" in r.output
+
+    def test_pref_cli_list_empty(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["pref", "list"])
+        assert "暂无" in r.output
+
+    def test_pref_cli_delete(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["pref", "set", "del_me", "val"])
+        r = runner.invoke(cli, ["pref", "delete", "del_me"])
+        assert "✓" in r.output
+        r2 = runner.invoke(cli, ["pref", "delete", "nonexistent"])
+        assert "不存在" in r2.output
