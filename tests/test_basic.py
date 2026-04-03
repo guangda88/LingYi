@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.9.0"
+        assert __version__ == "0.10.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.9.0" in r.output
+        assert "0.10.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1399,3 +1399,148 @@ class TestDigest:
         runner = CliRunner()
         r = runner.invoke(cli, ["digest", "--file", "/nonexistent/file.txt"])
         assert "不存在" in r.output
+
+
+# ── v0.10 编程辅助深化 ──────────────────────────────
+
+class TestCodeReview:
+    def test_review_file_not_found(self):
+        from lingyi.code import review_code
+        result = review_code("/nonexistent/file.py")
+        assert result["available"] is False
+        assert "不存在" in result["answer"]
+
+    def test_review_not_a_file(self, tmp_path):
+        from lingyi.code import review_code
+        d = tmp_path / "dir"
+        d.mkdir()
+        result = review_code(str(d))
+        assert result["available"] is False
+        assert "不是文件" in result["answer"]
+
+    def test_review_success(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.code._ask_engine", lambda prompt: {
+            "answer": "代码质量良好", "available": True,
+        })
+        f = tmp_path / "test.py"
+        f.write_text("def hello(): pass", encoding="utf-8")
+        from lingyi.code import review_code
+        result = review_code(str(f))
+        assert result["available"] is True
+        assert "test.py" in result["file"]
+
+    def test_review_truncates_long_file(self, tmp_path, monkeypatch):
+        captured = {}
+        def mock_ask(prompt):
+            captured["len"] = len(prompt)
+            return {"answer": "OK", "available": True}
+        monkeypatch.setattr("lingyi.code._ask_engine", mock_ask)
+        f = tmp_path / "big.py"
+        f.write_text("x\n" * 15000, encoding="utf-8")
+        from lingyi.code import review_code
+        result = review_code(str(f))
+        assert result["available"] is True
+        assert captured["len"] < 25000
+
+
+class TestCheckDeps:
+    def test_deps_project_not_found(self):
+        from lingyi.code import check_dependencies
+        result = check_dependencies("/nonexistent/project")
+        assert result["available"] is False
+        assert "不存在" in result["answer"]
+
+    def test_deps_no_dep_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.code._ask_engine", lambda prompt: {
+            "answer": "分析结果", "available": True,
+        })
+        from lingyi.code import check_dependencies
+        result = check_dependencies(str(tmp_path))
+        assert result["available"] is False
+        assert "未找到" in result["answer"]
+
+    def test_deps_with_pyproject(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.code._ask_engine", lambda prompt: {
+            "answer": "依赖分析完成", "available": True,
+        })
+        (tmp_path / "pyproject.toml").write_text("[project]\nname='test'", encoding="utf-8")
+        from lingyi.code import check_dependencies
+        result = check_dependencies(str(tmp_path))
+        assert result["available"] is True
+        assert result["dep_file"] == "pyproject.toml"
+
+    def test_deps_with_requirements(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.code._ask_engine", lambda prompt: {
+            "answer": "依赖检查完成", "available": True,
+        })
+        (tmp_path / "requirements.txt").write_text("click\nedge-tts", encoding="utf-8")
+        from lingyi.code import check_dependencies
+        result = check_dependencies(str(tmp_path))
+        assert result["available"] is True
+        assert result["dep_file"] == "requirements.txt"
+
+
+class TestRefactor:
+    def test_refactor_file_not_found(self):
+        from lingyi.code import suggest_refactor
+        result = suggest_refactor("/nonexistent/file.py")
+        assert result["available"] is False
+
+    def test_refactor_success(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.code._ask_engine", lambda prompt: {
+            "answer": "建议拆分函数", "available": True,
+        })
+        f = tmp_path / "refactor.py"
+        f.write_text("def long_func(): pass", encoding="utf-8")
+        from lingyi.code import suggest_refactor
+        result = suggest_refactor(str(f))
+        assert result["available"] is True
+        assert "建议" in result["answer"]
+
+    def test_refactor_truncates(self, tmp_path, monkeypatch):
+        captured = {}
+        def mock_ask(prompt):
+            captured["truncated"] = "截断" in prompt
+            return {"answer": "OK", "available": True}
+        monkeypatch.setattr("lingyi.code._ask_engine", mock_ask)
+        f = tmp_path / "big.py"
+        f.write_text("x\n" * 15000, encoding="utf-8")
+        from lingyi.code import suggest_refactor
+        result = suggest_refactor(str(f))
+        assert result["available"] is True
+        assert captured["truncated"] is True
+
+
+class TestCodeCLI:
+    def test_review_cli(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.code.review_code", lambda fp: {
+            "answer": "代码审查通过", "available": True, "file": fp,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["review", "test.py"])
+        assert r.exit_code == 0
+        assert "灵克回答" in r.output
+
+    def test_deps_cli(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.code.check_dependencies", lambda pp: {
+            "answer": "依赖正常", "available": True, "project": pp, "dep_file": "pyproject.toml",
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["deps", "/home/ai/LingYi"])
+        assert r.exit_code == 0
+        assert "灵克回答" in r.output
+
+    def test_refactor_cli(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.code.suggest_refactor", lambda fp: {
+            "answer": "建议重构", "available": True, "file": fp,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["refactor", "test.py"])
+        assert r.exit_code == 0
+        assert "灵克回答" in r.output

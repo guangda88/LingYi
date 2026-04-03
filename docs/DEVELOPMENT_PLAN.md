@@ -219,7 +219,27 @@ cat notes.txt | lingyi digest
 
 ---
 
-## v0.10+ 按需
+## v0.10 编程辅助深化 ✅ 已完成
+
+**目标**：扩展灵克能力，支持代码审查、依赖检查、重构建议。
+
+|| 任务 | 产出 | 预计 |
+||------|------|------|
+|| 代码审查 | `review_code()` + `lingyi review` | 1h |
+|| 依赖检查 | `check_dependencies()` + `lingyi deps` | 30min |
+|| 重构建议 | `suggest_refactor()` + `lingyi refactor` | 30min |
+|| 测试 | 14个新测试 | 30min |
+
+**交付标准**：
+```bash
+lingyi review src/lingyi/digest.py     # 代码审查
+lingyi deps /home/ai/LingYi            # 依赖检查
+lingyi refactor src/lingyi/schedule.py # 重构建议
+```
+
+---
+
+## v0.11+ 按需
 
 - 编程辅助深度集成
 - 双向语音对话（本地 STT + TTS，完全离线）
@@ -239,6 +259,7 @@ v0.6 语音   ~4h   ✅ 已完成
 v0.7 智能   ~4h   ✅ 已完成
 v0.8 连接   ~4h   ✅ 已完成
 v0.9 整理   ~3h   ✅ 已完成
+v0.10 编程  ~3h   ✅ 已完成
 
 合计 ~31h，按每周 8-12 小时，约三周完成 v0.3-v0.6。
 ```
