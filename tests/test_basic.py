@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.8.0"
+        assert __version__ == "0.9.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.8.0" in r.output
+        assert "0.9.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1287,3 +1287,115 @@ class TestConnectCLI:
         runner = CliRunner()
         r = runner.invoke(cli, ["code", "测试"])
         assert "⚠" in r.output
+
+
+# ── v0.9 信息整理 ──────────────────────────────────
+
+class TestDigest:
+    def test_digest_empty(self):
+        from lingyi.digest import digest_text
+        result = digest_text("")
+        assert result["todos"] == []
+        assert result["raw_lines"] == 0
+
+    def test_digest_todos(self):
+        from lingyi.digest import digest_text
+        text = "需要完成v0.9开发\n记得去买菜\n随便一行"
+        result = digest_text(text)
+        assert len(result["todos"]) == 2
+        assert any("v0.9" in t for t in result["todos"])
+        assert any("买菜" in t for t in result["todos"])
+
+    def test_digest_decisions(self):
+        from lingyi.digest import digest_text
+        text = "决定用SQLite存储\n确定了方案A\n随便说说"
+        result = digest_text(text)
+        assert len(result["decisions"]) == 2
+        assert any("SQLite" in d for d in result["decisions"])
+
+    def test_digest_prefs(self):
+        from lingyi.digest import digest_text
+        text = "偏好简洁输出\n习惯用vim\n其他内容"
+        result = digest_text(text)
+        assert len(result["prefs"]) == 2
+        assert any("简洁" in p for p in result["prefs"])
+
+    def test_digest_facts(self):
+        from lingyi.digest import digest_text
+        text = "重要的是先完成核心功能\n关键在于性能优化\n普通内容"
+        result = digest_text(text)
+        assert len(result["facts"]) == 2
+        assert any("核心功能" in f for f in result["facts"])
+
+    def test_digest_mixed(self):
+        from lingyi.digest import digest_text
+        text = "需要完成开发\n决定用Python\n偏好中文界面\n重要：先做测试\n这是普通行"
+        result = digest_text(text)
+        assert len(result["todos"]) >= 1
+        assert len(result["decisions"]) >= 1
+        assert len(result["prefs"]) >= 1
+        assert len(result["facts"]) >= 1
+        assert result["raw_lines"] == 5
+
+    def test_save_digest(self, tmp_db):
+        from lingyi.digest import digest_text, save_digest
+        data = digest_text("需要完成测试\n偏好用pytest")
+        result = save_digest(data)
+        assert result["memos_saved"] >= 1
+        assert result["prefs_saved"] >= 1
+
+    def test_save_digest_empty(self, tmp_db):
+        from lingyi.digest import save_digest
+        result = save_digest({"todos": [], "decisions": [], "prefs": [], "facts": []})
+        assert result["memos_saved"] == 0
+        assert result["prefs_saved"] == 0
+
+    def test_format_digest_empty(self):
+        from lingyi.digest import format_digest
+        text = format_digest({"todos": [], "decisions": [], "prefs": [], "facts": [], "raw_lines": 3})
+        assert "3 行" in text
+        assert "未提取" in text
+
+    def test_format_digest_with_data(self):
+        from lingyi.digest import format_digest
+        text = format_digest({
+            "todos": ["完成任务"], "decisions": ["用Python"],
+            "prefs": ["简洁"], "facts": ["性能关键"], "raw_lines": 4,
+        })
+        assert "待办" in text
+        assert "决策" in text
+        assert "偏好" in text
+        assert "要点" in text
+
+    def test_digest_cli_text(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["digest", "需要完成v0.9开发", "决定用Python"])
+        assert r.exit_code == 0
+        assert "待办" in r.output
+
+    def test_digest_cli_save(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["digest", "--save", "需要完成测试任务"])
+        assert r.exit_code == 0
+        assert "保存" in r.output
+
+    def test_digest_cli_file(self, tmp_db, tmp_path):
+        f = tmp_path / "notes.txt"
+        f.write_text("需要整理代码\n偏好简洁风格", encoding="utf-8")
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["digest", "--file", str(f)])
+        assert r.exit_code == 0
+        assert "待办" in r.output
+
+    def test_digest_cli_file_not_found(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["digest", "--file", "/nonexistent/file.txt"])
+        assert "不存在" in r.output
