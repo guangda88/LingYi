@@ -115,21 +115,31 @@ def register(group: click.Group):
             speak(clean_text_for_speech(output))
 
     @group.command("remind")
+    @click.option("--smart", "smart_flag", is_flag=True, help="智能提醒（综合偏好和记忆）")
     @click.option("--speak", "speak_flag", is_flag=True, help="语音播报")
-    def schedule_remind(speak_flag: bool):
+    def schedule_remind(smart_flag: bool, speak_flag: bool):
         """检查今日提醒（练功/日记/门诊/灵通问道）"""
+        if smart_flag:
+            output = sched_mod.smart_remind()
+            click.echo(output)
+            if speak_flag:
+                from ..tts import clean_text_for_speech
+                from ..tts import speak
+                speak(clean_text_for_speech(output))
+            return
+
         speech_parts = []
         practice = sched_mod.check_practice_remind()
         if practice:
-            click.echo(" Qi 今天早上练功至少30分钟！")
-            speech_parts.append("今天早上练功至少30分钟")
+            click.echo("🥋 今天有练功安排。")
+            speech_parts.append("今天有练功安排")
         else:
             click.echo("今天没有练功安排。")
         click.echo()
         journal = sched_mod.check_journal_remind()
         if journal:
-            click.echo("✍ 今晚11点记得写日记！")
-            speech_parts.append("今晚11点记得写日记")
+            click.echo("✍ 今晚有日记提醒。")
+            speech_parts.append("今晚有日记提醒")
         else:
             click.echo("今天没有日记提醒。")
         click.echo()
@@ -138,7 +148,7 @@ def register(group: click.Group):
             click.echo("⚠ 今天有门诊！")
             speech_parts.append("今天有门诊")
             for s in clinics:
-                slot_cn = sched_mod._SLOT_CN.get(s.time_slot, s.time_slot)
+                slot_cn = sched_mod.format_slot_cn(s.time_slot)
                 click.echo(f"  {slot_cn}  {s.description or '门诊'}")
                 speech_parts.append(f"{slot_cn}{s.description or '门诊'}")
         else:
@@ -146,9 +156,9 @@ def register(group: click.Group):
         click.echo()
         tomorrow_ask = sched_mod.check_tomorrow_ask()
         tomorrow = date.today() + timedelta(days=1)
-        tomorrow_cn = sched_mod._DAY_CN.get(tomorrow.strftime("%A"), "")
+        tomorrow_cn = sched_mod.format_day_cn(tomorrow.strftime("%A"))
         if tomorrow_ask:
-            click.echo(f"📢 明天{tomorrow_cn}早上6点有灵通问道更新，请确认内容是否已准备好！")
+            click.echo(f"📢 明天{tomorrow_cn}早上6点有灵通问道更新。")
             speech_parts.append(f"明天{tomorrow_cn}早上6点有灵通问道更新")
         else:
             click.echo(f"明天{tomorrow_cn}没有灵通问道更新。")

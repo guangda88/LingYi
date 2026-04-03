@@ -2,7 +2,7 @@
 
 import click
 
-from . import __version__, patrol as patrol_mod
+from . import __version__, patrol as patrol_mod, report as report_mod
 from .commands import memo as memo_cmds
 from .commands import schedule as sched_cmds
 from .commands import project as proj_cmds
@@ -68,6 +68,17 @@ chat_cmds.register(cli)
 def do_patrol():
     """巡检所有项目变化"""
     click.echo(patrol_mod.generate_report())
+
+
+@cli.command("report")
+@click.option("--speak", "speak_flag", is_flag=True, help="语音播报")
+def do_report(speak_flag: bool):
+    """生成本周周报"""
+    output = report_mod.generate_weekly_report()
+    click.echo(output)
+    if speak_flag:
+        from .tts import speak, clean_text_for_speech
+        speak(clean_text_for_speech(output))
 
 
 if __name__ == "__main__":

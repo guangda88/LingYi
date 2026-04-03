@@ -146,9 +146,93 @@ def today_schedules_for(day_name: str) -> list[Schedule]:
     return [Schedule(**dict(r)) for r in rows]
 
 
+def format_day_cn(day: str) -> str:
+    return _DAY_CN.get(day, day)
+
+
+def format_slot_cn(slot: str) -> str:
+    return _SLOT_CN.get(slot, slot)
+
+
 def check_remind() -> list[Schedule]:
     items = today_schedules()
     return [s for s in items if s.type == "clinic"]
+
+
+def smart_remind() -> str:
+    """智能提醒：综合日程、偏好、会话记忆给出建议。"""
+    from . import pref as pref_mod
+    from . import session as session_mod
+
+    lines = []
+    today = date.today()
+    today_cn = _DAY_CN.get(today.strftime("%A"), "")
+    lines.append(f"🧠 智能提醒 — 今天{today_cn}（{today.strftime('%m-%d')}）")
+    lines.append("")
+
+    # 1. 今日日程
+    items = today_schedules()
+    if items:
+        lines.append("📅 今日安排：")
+        for s in items:
+            slot_cn = _SLOT_CN.get(s.time_slot, s.time_slot)
+            desc = f" {s.description}" if s.description else ""
+            lines.append(f"  {slot_cn}  {s.type}{desc}")
+    else:
+        lines.append("📅 今天没有固定安排。")
+
+    # 2. 偏好提醒
+    prefs = pref_mod.list_prefs()
+    pref_dict = dict(prefs) if prefs else {}
+    lines.append("")
+    if pref_dict:
+        lines.append("⚙ 偏好提醒：")
+        for k, v in prefs:
+            if any(kw in k for kw in ("提醒", "习惯", "注意", "频率", "偏好")):
+                lines.append(f"  · {k}: {v}")
+
+    # 3. 上次会话待办
+    last = session_mod.last_session()
+    lines.append("")
+    if last and last.todos:
+        lines.append("📋 上次会话待办：")
+        for line in last.todos.strip().split("\n"):
+            line = line.strip().lstrip("- ").strip()
+            if line:
+                lines.append(f"  □ {line}")
+    else:
+        lines.append("📋 没有待办事项。")
+
+    # 4. 智能建议
+    lines.append("")
+    lines.append("💡 建议：")
+    suggestions = []
+
+    clinic_today = [s for s in items if s.type == "clinic"]
+    if clinic_today:
+        suggestions.append("今天有门诊，注意提前准备病例资料。")
+
+    practice_today = [s for s in items if s.type == "practice"]
+    if practice_today:
+        suggestions.append("今天有练功安排。")
+
+    if not items:
+        suggestions.append("今天没有固定安排，适合集中精力推进项目。")
+
+    commit_freq = pref_dict.get("代码提交频率", "")
+    if commit_freq and ("每天" in commit_freq or "每日" in commit_freq):
+        suggestions.append("今天可以提交代码。")
+
+    if last and last.summary:
+        suggestions.append("上次有未完成的会话，可以继续。")
+
+    if not suggestions:
+        suggestions.append("保持节奏，专注当前任务。")
+
+    for s in suggestions:
+        lines.append(f"  · {s}")
+
+    return "\n".join(lines)
 
 
 def check_practice_remind() -> list[Schedule]:

@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.6.0"
+        assert __version__ == "0.7.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.6.0" in r.output
+        assert "0.7.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1048,3 +1048,89 @@ class TestChat:
         runner = CliRunner()
         r = runner.invoke(cli, ["chat"], input="q\n")
         assert "再见" in r.output
+
+
+# ── v0.7 智能：智能提醒 + 周报 ─────────────────────────
+
+class TestSmartRemind:
+    def test_smart_remind_basic(self, tmp_db):
+        from lingyi.schedule import smart_remind
+        result = smart_remind()
+        assert "智能提醒" in result
+        assert "建议" in result
+
+    def test_smart_remind_with_prefs(self, tmp_db):
+        from lingyi.schedule import smart_remind
+        from lingyi.pref import set_pref
+        set_pref("提醒_喝水", "每小时一杯")
+        result = smart_remind()
+        assert "偏好提醒" in result
+        assert "喝水" in result
+
+    def test_smart_remind_with_session_todos(self, tmp_db):
+        from lingyi.schedule import smart_remind
+        from lingyi.session import save_session
+        save_session(summary="开发v0.7", todos="- 完成智能提醒\n- 完成周报")
+        result = smart_remind()
+        assert "上次会话待办" in result
+        assert "智能提醒" in result
+
+    def test_smart_remind_with_schedule(self, tmp_db, monkeypatch):
+        from datetime import date
+        from lingyi.schedule import add_schedule, smart_remind
+        today_name = date.today().strftime("%A")
+        add_schedule("clinic", today_name, "morning", "骨伤科门诊")
+        result = smart_remind()
+        assert "clinic" in result or "门诊" in result
+
+    def test_smart_remind_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "smart.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["schedule", "remind", "--smart"])
+        assert "智能提醒" in r.output
+
+
+class TestWeeklyReport:
+    def test_report_basic(self, tmp_db):
+        from lingyi.report import generate_weekly_report
+        result = generate_weekly_report()
+        assert "周报" in result
+        assert "计划进度" in result
+        assert "活跃项目" in result
+
+    def test_report_with_plans(self, tmp_db):
+        from lingyi.report import generate_weekly_report
+        from lingyi.plan import add_plan, done_plan
+        p = add_plan("完成周报功能", area="编程")
+        done_plan(p.id)
+        result = generate_weekly_report()
+        assert "50%" in result or "100%" in result
+
+    def test_report_with_memos(self, tmp_db):
+        from lingyi.report import generate_weekly_report
+        from lingyi.memo import add_memo
+        add_memo("v0.7开发进行中")
+        result = generate_weekly_report()
+        assert "v0.7" in result
+
+    def test_report_with_session(self, tmp_db):
+        from lingyi.report import generate_weekly_report
+        from lingyi.session import save_session
+        save_session(summary="完成v0.7智能提醒和周报")
+        result = generate_weekly_report()
+        assert "v0.7" in result
+
+    def test_report_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "report.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["report"])
+        assert "周报" in r.output
+        assert r.exit_code == 0
