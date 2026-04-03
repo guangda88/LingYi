@@ -3,22 +3,8 @@
 import os
 import subprocess
 from datetime import datetime, timedelta
-from pathlib import Path
 
-
-PROJECTS = {
-    "灵克 LingClaude": "/home/ai/LingClaude",
-    "灵通 LingFlow": "/home/ai/LingFlow",
-    "灵知系统": "/home/ai/zhineng-knowledge-system",
-    "灵依 LingYi": "/home/ai/LingYi",
-    "灵通问道": "/home/ai/lingtongask",
-    "灵犀 MCP": "/home/ai/Ling-term-mcp",
-    "灵极优": "/home/ai/LingMinOpt",
-    "灵研": "/home/ai/lingresearch",
-    "智桥": "/home/ai/zhineng-bridge",
-    "中医知识库": "/home/ai/ai-knowledge-base",
-    "ai-server": "/home/ai/ai-server",
-}
+from .config import load_patrol_paths
 
 SINCE_HOURS = 3
 
@@ -70,18 +56,20 @@ def check_project(name: str, path: str) -> dict:
 
 
 def generate_report() -> str:
+    projects = load_patrol_paths()
+    if not projects:
+        return "未配置巡检项目路径（检查 ~/.lingyi/presets.json 的 patrol_paths）。"
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = [f"📋 灵依巡检报告 — {now}", "=" * 50, ""]
 
     changed = []
     silent = []
 
-    for name, path in PROJECTS.items():
+    for name, path in projects.items():
         info = check_project(name, path)
         if info["status"] == "有变化":
             changed.append(info)
-        elif info["status"] == "无变化":
-            silent.append(info)
         else:
             silent.append(info)
 

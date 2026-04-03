@@ -46,7 +46,7 @@
      "repo": "zhineng-knowledge-system", "version": "v1.3.0", "energy_pct": 25},
     {"name": "LingYi", "alias": "灵依", "status": "active", "priority": "P1",
      "category": "app", "description": "私我AI助理",
-     "repo": "LingYi", "version": "v0.2.0", "energy_pct": 10},
+     "repo": "LingYi", "version": "v0.4.0", "energy_pct": 10},
     {"name": "lingtongask", "alias": "灵通问道", "status": "active", "priority": "P2",
      "category": "content", "description": "AI气功播客，每周5更",
      "repo": "lingtongask", "version": "v0.1.0", "energy_pct": 5},
@@ -77,5 +77,8 @@
     {"name": "lingflow-skills-index", "alias": "技能市场", "status": "archived", "priority": "P3",
      "category": "tool", "description": "LingFlow技能市场索引",
      "repo": "lingflow-skills-index", "version": "", "energy_pct": 0}
-  ]
+  ],
+  "patrol_paths": {
+    "灵依 LingYi": "/home/ai/LingYi"
+  }
 }

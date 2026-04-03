@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -481,3 +481,312 @@ class TestPlan:
         assert "编程" in r.output
         r = runner.invoke(cli, ["plan", "week"])
         assert "本周计划" in r.output
+
+
+# ── config 测试 ──────────────────────────────────────
+
+class TestConfig:
+    def test_load_presets(self, tmp_db):
+        from lingyi.config import load_presets
+        p = load_presets()
+        assert "schedules" in p
+        assert "projects" in p
+        assert "patrol_paths" in p
+
+    def test_load_presets_missing_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", tmp_path / "nope.json")
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        from lingyi.config import load_presets
+        p = load_presets()
+        assert p == {"schedules": {}, "projects": [], "patrol_paths": {}}
+
+    def test_load_schedule_preset(self, tmp_db):
+        from lingyi.config import load_schedule_preset
+        clinic = load_schedule_preset("clinic")
+        assert len(clinic) == 6
+        assert clinic[0][0] == "Tuesday"
+
+    def test_load_schedule_preset_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", tmp_path / "nope.json")
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        from lingyi.config import load_schedule_preset
+        assert load_schedule_preset("nonexistent") == []
+
+    def test_load_project_presets(self, tmp_db):
+        from lingyi.config import load_project_presets
+        projects = load_project_presets()
+        assert len(projects) == 14
+        names = [p["name"] for p in projects]
+        assert "LingFlow" in names
+
+    def test_load_patrol_paths(self, tmp_db):
+        from lingyi.config import load_patrol_paths
+        paths = load_patrol_paths()
+        assert "灵依 LingYi" in paths
+        assert paths["灵依 LingYi"] == "/home/ai/LingYi"
+
+
+# ── patrol 测试 ──────────────────────────────────────
+
+class TestPatrol:
+    def test_check_project_no_git(self, tmp_path):
+        from lingyi.patrol import check_project
+        info = check_project("测试", str(tmp_path / "nogit"))
+        assert info["status"] == "无git仓库"
+
+    def test_check_project_with_git(self, tmp_path):
+        import subprocess
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=str(repo), capture_output=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "--allow-empty", "-m", "init"],
+                       capture_output=True)
+        from lingyi.patrol import check_project
+        info = check_project("我的仓库", str(repo))
+        assert info["status"] in ("有变化", "无变化")
+        assert "branch" in info
+
+    def test_generate_report_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", tmp_path / "nope.json")
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        from lingyi.patrol import generate_report
+        text = generate_report()
+        assert "未配置" in text
+
+    def test_generate_report_with_path(self, tmp_db):
+        from lingyi.patrol import generate_report
+        text = generate_report()
+        assert "灵依" in text
+
+
+# ── schedule 边界测试 ──────────────────────────────
+
+class TestScheduleBoundary:
+    def test_init_ask(self, tmp_db):
+        from lingyi.schedule import init_ask
+        items = init_ask()
+        assert len(items) == 5
+        assert all(s.type == "ask" for s in items)
+
+    def test_init_journal(self, tmp_db):
+        from lingyi.schedule import init_journal
+        items = init_journal()
+        assert len(items) == 7
+        assert all(s.type == "journal" for s in items)
+        assert all("日记" in s.description for s in items)
+
+    def test_check_journal_remind(self, tmp_db):
+        from lingyi.schedule import init_journal, check_journal_remind
+        init_journal()
+        items = check_journal_remind()
+        assert len(items) == 1
+
+    def test_check_tomorrow_ask(self, tmp_db):
+        from lingyi.schedule import init_ask, check_tomorrow_ask
+        from datetime import date, timedelta
+        init_ask()
+        tomorrow_name = (date.today() + timedelta(days=1)).strftime("%A")
+        ask_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        items = check_tomorrow_ask()
+        if tomorrow_name in ask_days:
+            assert len(items) > 0
+        else:
+            assert len(items) == 0
+
+    def test_format_schedule(self, tmp_db):
+        from lingyi.schedule import add_schedule, format_schedule
+        s = add_schedule("study", "Saturday", "morning", "编程学习")
+        text = format_schedule(s)
+        assert "周六" in text
+        assert "上午" in text
+        assert "编程学习" in text
+
+    def test_format_today_empty(self, tmp_db):
+        from lingyi.schedule import format_today
+        text = format_today()
+        assert "没有安排" in text
+
+    def test_format_today_with_data(self, tmp_db):
+        from lingyi.schedule import init_clinic, format_today
+        from datetime import date
+        init_clinic()
+        text = format_today()
+        today_name = date.today().strftime("%A")
+        clinic_days = ["Tuesday", "Wednesday", "Thursday"]
+        if today_name in clinic_days:
+            assert "门诊" in text or "医院" in text
+        else:
+            assert "没有安排" in text
+
+    def test_format_week(self, tmp_db):
+        from lingyi.schedule import init_clinic, format_week
+        init_clinic()
+        text = format_week()
+        assert "周一" in text
+        assert "周日" in text
+        assert "今天" in text
+
+    def test_schedule_cli_init_ask(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_ask.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["schedule", "init", "ask"])
+        assert r.exit_code == 0
+        assert "5" in r.output
+
+    def test_schedule_cli_init_journal(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_jour.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["schedule", "init", "journal"])
+        assert r.exit_code == 0
+        assert "7" in r.output
+
+    def test_schedule_cli_remind(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_rem.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["schedule", "init", "practice"])
+        runner.invoke(cli, ["schedule", "init", "journal"])
+        r = runner.invoke(cli, ["schedule", "remind"])
+        assert r.exit_code == 0
+
+
+# ── memo CLI 边界测试 ────────────────────────────────
+
+class TestMemoCLI:
+    def test_memo_show_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_ms.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["memo", "add", "可查看的备忘"])
+        r = runner.invoke(cli, ["memo", "show", "1"])
+        assert "可查看的备忘" in r.output
+        r = runner.invoke(cli, ["memo", "show", "999"])
+        assert "不存在" in r.output
+
+    def test_memo_delete_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_md.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["memo", "add", "要删的备忘"])
+        r = runner.invoke(cli, ["memo", "delete", "1"])
+        assert "已删除" in r.output
+        r = runner.invoke(cli, ["memo", "delete", "999"])
+        assert "不存在" in r.output
+
+    def test_memo_list_empty(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_me.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["memo", "list"])
+        assert "暂无" in r.output
+
+
+# ── plan 边界测试 ──────────────────────────────────
+
+class TestPlanBoundary:
+    def test_week_plans_with_data(self, tmp_db):
+        from datetime import date, timedelta
+        from lingyi.plan import add_plan, week_plans
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        add_plan("本周任务", due_date=monday.isoformat())
+        add_plan("下周任务", due_date=(monday + timedelta(days=8)).isoformat())
+        items = week_plans()
+        assert len(items) == 1
+        assert items[0].content == "本周任务"
+
+    def test_plan_list_empty(self, tmp_db):
+        from lingyi.plan import list_plans
+        assert list_plans() == []
+
+    def test_plan_list_order(self, tmp_db):
+        from lingyi.plan import add_plan, list_plans
+        add_plan("待办A")
+        p = add_plan("已完成B")
+        from lingyi.plan import done_plan
+        done_plan(p.id)
+        add_plan("待办C")
+        items = list_plans()
+        assert items[0].status == "todo"
+        assert items[1].status == "todo"
+        assert items[2].status == "done"
+
+    def test_plan_cancel_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_pc.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        runner.invoke(cli, ["plan", "add", "取消任务"])
+        r = runner.invoke(cli, ["plan", "cancel", "1"])
+        assert "已取消" in r.output
+        r = runner.invoke(cli, ["plan", "cancel", "999"])
+        assert "不存在" in r.output
+
+    def test_plan_list_empty_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_pe.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["plan", "list"])
+        assert "暂无" in r.output
+
+    def test_plan_show_not_found_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_pnf.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["plan", "show", "999"])
+        assert "不存在" in r.output
+
+    def test_plan_done_not_found_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_pdnf.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["plan", "done", "999"])
+        assert "不存在" in r.output
+
+
+# ── version 测试 ──────────────────────────────────
+
+class TestVersion:
+    def test_version_consistency(self):
+        from lingyi import __version__
+        assert __version__ == "0.4.0"
+
+    def test_cli_version(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "v.db")
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["--version"])
+        assert "0.4.0" in r.output

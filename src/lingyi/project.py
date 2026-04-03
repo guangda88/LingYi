@@ -67,10 +67,7 @@ def list_projects(status: str | None = None, category: str | None = None) -> lis
         params.append(category)
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
-    sql += " ORDER BY CASE priority"
-    for i, p in enumerate(["P0", "P1", "P2", "P3"]):
-        sql += f" WHEN '{p}' THEN {i}"
-    sql += " ELSE 4 END, name"
+    sql += " ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, name"
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [Project(**dict(r)) for r in rows]

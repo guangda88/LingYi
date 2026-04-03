@@ -1,13 +1,12 @@
 """灵依 LingYi CLI 入口。"""
 
 import click
-from datetime import date, timedelta
 
 from . import __version__, patrol as patrol_mod
-from . import memo as memo_mod
-from . import schedule as sched_mod
-from . import project as proj_mod
-from . import plan as plan_mod
+from .commands import memo as memo_cmds
+from .commands import schedule as sched_cmds
+from .commands import project as proj_cmds
+from .commands import plan as plan_cmds
 
 
 @click.group()
@@ -17,58 +16,11 @@ def cli():
     pass
 
 
-# ── memo ──────────────────────────────────────────────
-
 @cli.group()
 def memo():
     """备忘录"""
     pass
 
-
-@memo.command("add")
-@click.argument("content")
-def memo_add(content: str):
-    """添加备忘"""
-    m = memo_mod.add_memo(content)
-    click.echo(f"✓ 备忘 #{m.id} 已添加")
-
-
-@memo.command("list")
-def memo_list():
-    """查看所有备忘"""
-    memos = memo_mod.list_memos()
-    if not memos:
-        click.echo("暂无备忘。")
-        return
-    for m in memos:
-        click.echo(f"  [{m.id}] {m.content}  ({m.created_at})")
-
-
-@memo.command("show")
-@click.argument("memo_id", type=int)
-def memo_show(memo_id: int):
-    """查看单条备忘"""
-    m = memo_mod.show_memo(memo_id)
-    if not m:
-        click.echo(f"备忘 #{memo_id} 不存在。")
-        return
-    click.echo(f"  #{m.id}")
-    click.echo(f"  内容：{m.content}")
-    click.echo(f"  创建：{m.created_at}")
-    click.echo(f"  更新：{m.updated_at}")
-
-
-@memo.command("delete")
-@click.argument("memo_id", type=int)
-def memo_delete(memo_id: int):
-    """删除备忘"""
-    if memo_mod.delete_memo(memo_id):
-        click.echo(f"✓ 备忘 #{memo_id} 已删除")
-    else:
-        click.echo(f"备忘 #{memo_id} 不存在。")
-
-
-# ── schedule ──────────────────────────────────────────
 
 @cli.group()
 def schedule():
@@ -76,243 +28,11 @@ def schedule():
     pass
 
 
-@schedule.command("init")
-@click.argument("preset", default="clinic")
-def schedule_init(preset: str):
-    """初始化排班（clinic/ask/practice/journal）"""
-    if preset == "clinic":
-        items = sched_mod.init_clinic()
-        click.echo(f"✓ 门诊排班已初始化（{len(items)}个时段）")
-    elif preset == "ask":
-        items = sched_mod.init_ask()
-        click.echo(f"✓ 灵通问道排班已初始化（{len(items)}个时段）")
-    elif preset == "practice":
-        items = sched_mod.init_practice()
-        click.echo(f"✓ 练功排班已初始化（{len(items)}个时段）")
-    elif preset == "journal":
-        items = sched_mod.init_journal()
-        click.echo(f"✓ 日记提醒已初始化（{len(items)}个时段）")
-    else:
-        click.echo(f"未知预设：{preset}（可用：clinic, ask, practice, journal）")
-
-
-@schedule.command("add")
-@click.option("--type", "schedule_type", required=True, help="类型：clinic/study/…")
-@click.option("--day", required=True, help="星期：Monday/Tuesday/…")
-@click.option("--time", "time_slot", required=True, help="时段：morning/afternoon/evening")
-@click.option("--desc", default="", help="描述")
-def schedule_add(schedule_type: str, day: str, time_slot: str, desc: str):
-    """添加日程"""
-    s = sched_mod.add_schedule(schedule_type, day, time_slot, desc)
-    click.echo(f"✓ 日程 #{s.id} 已添加：{sched_mod.format_schedule(s)}")
-
-
-@schedule.command("list")
-@click.option("--type", "schedule_type", default=None, help="按类型筛选")
-def schedule_list(schedule_type: str | None):
-    """查看所有日程"""
-    items = sched_mod.list_schedules(schedule_type=schedule_type)
-    if not items:
-        click.echo("暂无日程。")
-        return
-    for s in items:
-        click.echo(f"  {sched_mod.format_schedule(s)}")
-
-
-@schedule.command("show")
-@click.argument("schedule_id", type=int)
-def schedule_show(schedule_id: int):
-    """查看日程详情"""
-    s = sched_mod.show_schedule(schedule_id)
-    if not s:
-        click.echo(f"日程 #{schedule_id} 不存在。")
-        return
-    click.echo(f"  #{s.id}")
-    click.echo(f"  类型：{s.type}")
-    click.echo(f"  时间：{s.day} {s.time_slot}")
-    click.echo(f"  描述：{s.description or '—'}")
-    click.echo(f"  状态：{'活跃' if s.is_active else '已取消'}")
-
-
-@schedule.command("update")
-@click.argument("schedule_id", type=int)
-@click.option("--type", "schedule_type", default=None)
-@click.option("--day", default=None)
-@click.option("--time", "time_slot", default=None)
-@click.option("--desc", default=None)
-def schedule_update(schedule_id: int, schedule_type: str | None, day: str | None,
-                    time_slot: str | None, desc: str | None):
-    """修改日程"""
-    kwargs = {}
-    if schedule_type:
-        kwargs["type"] = schedule_type
-    if day:
-        kwargs["day"] = day
-    if time_slot:
-        kwargs["time_slot"] = time_slot
-    if desc is not None:
-        kwargs["description"] = desc
-    s = sched_mod.update_schedule(schedule_id, **kwargs)
-    if not s:
-        click.echo(f"日程 #{schedule_id} 不存在。")
-        return
-    click.echo(f"✓ 已更新：{sched_mod.format_schedule(s)}")
-
-
-@schedule.command("cancel")
-@click.argument("schedule_id", type=int)
-def schedule_cancel(schedule_id: int):
-    """取消日程"""
-    if sched_mod.cancel_schedule(schedule_id):
-        click.echo(f"✓ 日程 #{schedule_id} 已取消")
-    else:
-        click.echo(f"日程 #{schedule_id} 不存在。")
-
-
-@schedule.command("today")
-def schedule_today():
-    """今日安排"""
-    click.echo(sched_mod.format_today())
-
-
-@schedule.command("week")
-def schedule_week():
-    """本周一览"""
-    click.echo("📅 本周排班：")
-    click.echo(sched_mod.format_week())
-
-
-@schedule.command("remind")
-def schedule_remind():
-    """检查今日提醒（练功/日记/门诊/灵通问道）"""
-    practice = sched_mod.check_practice_remind()
-    if practice:
-        click.echo(" Qi 今天早上练功至少30分钟！")
-    else:
-        click.echo("今天没有练功安排。")
-    click.echo()
-    journal = sched_mod.check_journal_remind()
-    if journal:
-        click.echo("✍ 今晚11点记得写日记！")
-    else:
-        click.echo("今天没有日记提醒。")
-    click.echo()
-    clinics = sched_mod.check_remind()
-    if clinics:
-        click.echo("⚠ 今天有门诊！")
-        for s in clinics:
-            slot_cn = sched_mod._SLOT_CN.get(s.time_slot, s.time_slot)
-            click.echo(f"  {slot_cn}  {s.description or '门诊'}")
-    else:
-        click.echo("今天没有门诊。")
-    click.echo()
-    tomorrow_ask = sched_mod.check_tomorrow_ask()
-    tomorrow = date.today() + timedelta(days=1)
-    tomorrow_cn = sched_mod._DAY_CN.get(tomorrow.strftime("%A"), "")
-    if tomorrow_ask:
-        click.echo(f"📢 明天{tomorrow_cn}早上6点有灵通问道更新，请确认内容是否已准备好！")
-    else:
-        click.echo(f"明天{tomorrow_cn}没有灵通问道更新。")
-
-
-# ── project ──────────────────────────────────────────
-
 @cli.group("project")
 def project():
     """项目管理"""
     pass
 
-
-@project.command("init")
-def project_init():
-    """导入项目"""
-    items = proj_mod.init_projects()
-    if not items:
-        click.echo("没有可导入的项目（检查 ~/.lingyi/presets.json）")
-    else:
-        click.echo(f"✓ 已导入 {len(items)} 个项目")
-
-
-@project.command("list")
-@click.option("--status", default=None, help="按状态筛选：active/maintenance/paused/archived")
-@click.option("--category", default=None, help="按分类筛选：core/knowledge/tool/…")
-def project_list(status: str | None, category: str | None):
-    """项目看板"""
-    if status or category:
-        items = proj_mod.list_projects(status=status, category=category)
-        if not items:
-            click.echo("没有匹配的项目。")
-            return
-        for p in items:
-            click.echo(proj_mod.format_project_short(p))
-        return
-    click.echo(proj_mod.format_project_kanban())
-
-
-@project.command("show")
-@click.argument("name")
-def project_show(name: str):
-    """查看项目详情"""
-    p = proj_mod.show_project(name)
-    if not p:
-        click.echo(f"项目「{name}」不存在。")
-        return
-    click.echo(proj_mod.format_project_detail(p))
-
-
-@project.command("add")
-@click.argument("name")
-@click.option("--alias", default="", help="别名")
-@click.option("--status", default="active", help="状态")
-@click.option("--priority", default="P3", help="优先级：P0/P1/P2/P3")
-@click.option("--category", default="tool", help="分类")
-@click.option("--desc", default="", help="说明")
-@click.option("--repo", default="", help="仓库名")
-@click.option("--version", default="", help="版本")
-@click.option("--energy", default=0, type=int, help="精力分配百分比")
-@click.option("--notes", default="", help="备注")
-def project_add(name: str, alias: str, status: str, priority: str, category: str,
-                desc: str, repo: str, version: str, energy: int, notes: str):
-    """添加项目"""
-    p = proj_mod.add_project(name, alias=alias, status=status, priority=priority,
-                             category=category, description=desc, repo=repo,
-                             version=version, energy_pct=energy, notes=notes)
-    click.echo(f"✓ 项目「{p.name}」已添加")
-
-
-@project.command("update")
-@click.argument("name")
-@click.option("--alias", default=None, help="别名")
-@click.option("--status", default=None, help="状态")
-@click.option("--priority", default=None, help="优先级")
-@click.option("--category", default=None, help="分类")
-@click.option("--desc", default=None, help="说明")
-@click.option("--repo", default=None, help="仓库名")
-@click.option("--version", default=None, help="版本")
-@click.option("--energy", default=None, type=int, help="精力分配百分比")
-@click.option("--notes", default=None, help="备注")
-def project_update(name: str, alias: str | None, status: str | None, priority: str | None,
-                   category: str | None, desc: str | None, repo: str | None,
-                   version: str | None, energy: int | None, notes: str | None):
-    """更新项目"""
-    kwargs = {}
-    if alias is not None: kwargs["alias"] = alias
-    if status is not None: kwargs["status"] = status
-    if priority is not None: kwargs["priority"] = priority
-    if category is not None: kwargs["category"] = category
-    if desc is not None: kwargs["description"] = desc
-    if repo is not None: kwargs["repo"] = repo
-    if version is not None: kwargs["version"] = version
-    if energy is not None: kwargs["energy_pct"] = energy
-    if notes is not None: kwargs["notes"] = notes
-    p = proj_mod.update_project(name, **kwargs)
-    if not p:
-        click.echo(f"项目「{name}」不存在。")
-        return
-    click.echo(f"✓ 已更新「{p.name}」")
-
-
-# ── plan ──────────────────────────────────────────────
 
 @cli.group("plan")
 def plan():
@@ -320,79 +40,11 @@ def plan():
     pass
 
 
-@plan.command("add")
-@click.argument("content")
-@click.option("--area", default="编程", help="领域：医疗/编程/研究/论文/学术")
-@click.option("--project", "proj", default="", help="关联项目")
-@click.option("--due", default="", help="截止日期 YYYY-MM-DD")
-@click.option("--notes", default="", help="备注")
-def plan_add(content: str, area: str, proj: str, due: str, notes: str):
-    """添加计划"""
-    p = plan_mod.add_plan(content, area=area, project=proj, due_date=due, notes=notes)
-    click.echo(f"✓ 计划 #{p.id} 已添加")
+memo_cmds.register(memo)
+sched_cmds.register(schedule)
+proj_cmds.register(project)
+plan_cmds.register(plan)
 
-
-@plan.command("list")
-@click.option("--area", default=None, help="按领域筛选")
-@click.option("--status", default=None, help="按状态筛选：todo/done/cancel")
-@click.option("--project", default=None, help="按项目筛选")
-def plan_list(area: str | None, status: str | None, project: str | None):
-    """查看计划列表"""
-    items = plan_mod.list_plans(area=area, status=status, project=project)
-    if not items:
-        click.echo("暂无计划。")
-        return
-    for p in items:
-        click.echo(plan_mod.format_plan_short(p))
-
-
-@plan.command("show")
-@click.argument("plan_id", type=int)
-def plan_show(plan_id: int):
-    """查看计划详情"""
-    p = plan_mod.show_plan(plan_id)
-    if not p:
-        click.echo(f"计划 #{plan_id} 不存在。")
-        return
-    click.echo(plan_mod.format_plan_detail(p))
-
-
-@plan.command("done")
-@click.argument("plan_id", type=int)
-def plan_done(plan_id: int):
-    """完成任务"""
-    p = plan_mod.done_plan(plan_id)
-    if not p:
-        click.echo(f"计划 #{plan_id} 不存在。")
-        return
-    click.echo(f"✓ 计划 #{plan_id}「{p.content}」已完成")
-
-
-@plan.command("cancel")
-@click.argument("plan_id", type=int)
-def plan_cancel(plan_id: int):
-    """取消任务"""
-    if plan_mod.cancel_plan(plan_id):
-        click.echo(f"✓ 计划 #{plan_id} 已取消")
-    else:
-        click.echo(f"计划 #{plan_id} 不存在。")
-
-
-@plan.command("week")
-def plan_week():
-    """本周计划"""
-    click.echo("📋 本周计划：")
-    click.echo(plan_mod.format_plan_week())
-
-
-@plan.command("stats")
-def plan_stats():
-    """完成率统计"""
-    click.echo("📊 各领域完成率：")
-    click.echo(plan_mod.format_plan_stats())
-
-
-# ── patrol ───────────────────────────────────────────
 
 @cli.command("patrol")
 def do_patrol():

@@ -18,5 +18,8 @@
     {"name": "MyProject", "alias": "我的项目", "status": "active", "priority": "P1",
      "category": "app", "description": "项目说明",
      "repo": "myproject", "version": "v0.1.0", "energy_pct": 50}
-  ]
+  ],
+  "patrol_paths": {
+    "MyProject": "/home/user/myproject"
+  }
 }

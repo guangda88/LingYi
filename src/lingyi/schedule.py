@@ -76,13 +76,9 @@ def list_schedules(schedule_type: str | None = None, active_only: bool = True) -
         conditions.append("is_active = 1")
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
-    sql += " ORDER BY CASE day"
-    for i, d in enumerate(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]):
-        sql += f" WHEN '{d}' THEN {i}"
-    sql += " ELSE 7 END, CASE time_slot"
-    for i, s in enumerate(["morning", "afternoon", "evening"]):
-        sql += f" WHEN '{s}' THEN {i}"
-    sql += " ELSE 3 END"
+    day_order = "CASE day WHEN 'Monday' THEN 0 WHEN 'Tuesday' THEN 1 WHEN 'Wednesday' THEN 2 WHEN 'Thursday' THEN 3 WHEN 'Friday' THEN 4 WHEN 'Saturday' THEN 5 WHEN 'Sunday' THEN 6 ELSE 7 END"
+    slot_order = "CASE time_slot WHEN 'morning' THEN 0 WHEN 'afternoon' THEN 1 WHEN 'evening' THEN 2 ELSE 3 END"
+    sql += f" ORDER BY {day_order}, {slot_order}"
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [Schedule(**dict(r)) for r in rows]
