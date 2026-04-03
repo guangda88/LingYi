@@ -1,5 +1,6 @@
-"""项目管理：14个项目录入、状态看板、优先级。"""
+"""项目管理：项目录入、状态看板、优先级。"""
 
+from .config import load_project_presets
 from .db import get_db
 from .models import Project
 
@@ -15,53 +16,11 @@ _CATEGORY_CN = {
     "content": "内容生成", "research": "AI研究", "infra": "基础设施", "app": "应用层",
 }
 
-_PROJECTS_DATA = [
-    {"name": "LingFlow", "alias": "灵通", "status": "active", "priority": "P0",
-     "category": "core", "description": "多智能体协作工程流平台",
-     "repo": "LingFlow", "version": "v3.8.0", "energy_pct": 25},
-    {"name": "LingClaude", "alias": "灵克", "status": "active", "priority": "P0",
-     "category": "core", "description": "本地AM自学习模型，编程能力核心",
-     "repo": "LingClaude", "version": "v0.2.0", "energy_pct": 25},
-    {"name": "灵知系统", "alias": "灵知", "status": "active", "priority": "P0",
-     "category": "knowledge", "description": "10域RAG知识库（儒释道医武哲科气心理+心理学）",
-     "repo": "zhineng-knowledge-system", "version": "v1.3.0", "energy_pct": 25},
-    {"name": "LingYi", "alias": "灵依", "status": "active", "priority": "P1",
-     "category": "app", "description": "私我AI助理",
-     "repo": "LingYi", "version": "v0.2.0", "energy_pct": 10},
-    {"name": "lingtongask", "alias": "灵通问道", "status": "active", "priority": "P2",
-     "category": "content", "description": "AI气功播客，每周5更",
-     "repo": "lingtongask", "version": "v0.1.0", "energy_pct": 5},
-    {"name": "Ling-term-mcp", "alias": "灵犀", "status": "maintenance", "priority": "P2",
-     "category": "tool", "description": "MCP终端服务器",
-     "repo": "Ling-term-mcp", "version": "v1.0.0", "energy_pct": 0},
-    {"name": "LingMinOpt", "alias": "灵极优", "status": "maintenance", "priority": "P3",
-     "category": "tool", "description": "通用自优化框架",
-     "repo": "LingMinOpt", "version": "v0.1.0", "energy_pct": 0},
-    {"name": "zhineng-bridge", "alias": "智桥", "status": "paused", "priority": "P3",
-     "category": "tool", "description": "跨设备AI编程指令同步",
-     "repo": "zhineng-bridge", "version": "v1.0.0", "energy_pct": 0},
-    {"name": "lingresearch", "alias": "灵研", "status": "paused", "priority": "P3",
-     "category": "research", "description": "自主AI研究框架",
-     "repo": "lingresearch", "version": "v0.1.0", "energy_pct": 0},
-    {"name": "ai-knowledge-base", "alias": "中医知识库", "status": "archived", "priority": "P3",
-     "category": "knowledge", "description": "中医知识库原始版（已被灵知取代）",
-     "repo": "ai-knowledge-base", "version": "", "energy_pct": 0},
-    {"name": "Knowledge-System", "alias": "IMA导出", "status": "archived", "priority": "P3",
-     "category": "tool", "description": "IMA知识库导出工具（已完成使命）",
-     "repo": "Knowledge-System", "version": "v1.0.0", "energy_pct": 0},
-    {"name": "ai-server", "alias": "AI私服", "status": "maintenance", "priority": "P3",
-     "category": "infra", "description": "ZBOX AI私服监控",
-     "repo": "ai-server", "version": "", "energy_pct": 0},
-    {"name": "lingflow-skills-example", "alias": "技能示例", "status": "archived", "priority": "P3",
-     "category": "tool", "description": "LingFlow技能示例",
-     "repo": "lingflow-skills-example", "version": "", "energy_pct": 0},
-    {"name": "lingflow-skills-index", "alias": "技能市场", "status": "archived", "priority": "P3",
-     "category": "tool", "description": "LingFlow技能市场索引",
-     "repo": "lingflow-skills-index", "version": "", "energy_pct": 0},
-]
-
 
 def init_projects() -> list[Project]:
+    _PROJECTS_DATA = load_project_presets()
+    if not _PROJECTS_DATA:
+        return []
     conn = get_db()
     existing = conn.execute("SELECT id FROM projects LIMIT 1").fetchone()
     if existing:

@@ -12,11 +12,15 @@ from lingyi.db import get_db
 from lingyi.models import Memo, Schedule, Project
 
 
+_TEST_PRESETS = Path(__file__).parent / "test_presets.json"
+
+
 @pytest.fixture
 def tmp_db(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
     monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
     monkeypatch.setattr("lingyi.db.DB_PATH", db_path)
+    monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
     return str(db_path)
 
 
@@ -148,6 +152,7 @@ class TestSchedule:
     def test_schedule_cli_practice(self, tmp_db, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
         monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_prac.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -164,6 +169,7 @@ class TestCLI:
     def test_memo_cli(self, tmp_db, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
         monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_test.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -176,6 +182,7 @@ class TestCLI:
     def test_schedule_cli(self, tmp_db, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
         monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_sched.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -298,6 +305,7 @@ class TestProject:
     def test_project_cli(self, tmp_db, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
         monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_proj.db")
+        monkeypatch.setattr("lingyi.config.PRESETS_PATH", _TEST_PRESETS)
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()

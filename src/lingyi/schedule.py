@@ -2,6 +2,7 @@
 
 from datetime import date, timedelta
 
+from .config import load_schedule_preset
 from .db import get_db
 from .models import Schedule
 
@@ -12,59 +13,43 @@ _DAY_CN = {
 
 _SLOT_CN = {"morning": "上午", "afternoon": "下午", "evening": "晚上"}
 
-_DEFAULT_CLINIC = [
-    ("Tuesday", "morning", "泰安八十八医院"),
-    ("Tuesday", "afternoon", "禾康中医医院"),
-    ("Wednesday", "morning", "岱岳区第二人民医院"),
-    ("Wednesday", "afternoon", "镜医堂中西医结合门诊"),
-    ("Thursday", "morning", "泰安八十八医院"),
-    ("Thursday", "afternoon", "禾康中医医院"),
-]
 
-_DEFAULT_ASK = [
-    ("Monday", "morning", "灵通问道频道更新 06:00"),
-    ("Tuesday", "morning", "灵通问道频道更新 06:00"),
-    ("Wednesday", "morning", "灵通问道频道更新 06:00"),
-    ("Thursday", "morning", "灵通问道频道更新 06:00"),
-    ("Friday", "morning", "灵通问道频道更新 06:00"),
-]
-
-_DEFAULT_PRACTICE = [
-    ("Monday", "morning", "练功 06:00 至少30分钟"),
-    ("Tuesday", "morning", "练功 06:00 至少30分钟"),
-    ("Wednesday", "morning", "练功 06:00 至少30分钟"),
-    ("Thursday", "morning", "练功 06:00 至少30分钟"),
-    ("Friday", "morning", "练功 06:00 至少30分钟"),
-    ("Saturday", "morning", "练功 06:00 至少30分钟"),
-    ("Sunday", "morning", "练功 06:00 至少30分钟"),
-]
-
-_DEFAULT_JOURNAL = [
-    ("Monday", "evening", "写日记 23:00"),
-    ("Tuesday", "evening", "写日记 23:00"),
-    ("Wednesday", "evening", "写日记 23:00"),
-    ("Thursday", "evening", "写日记 23:00"),
-    ("Friday", "evening", "写日记 23:00"),
-    ("Saturday", "evening", "写日记 23:00"),
-    ("Sunday", "evening", "写日记 23:00"),
-]
+def _init_preset(preset_name: str) -> list[Schedule]:
+    data = load_schedule_preset(preset_name)
+    if not data:
+        return []
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM schedules WHERE type = ?", (preset_name,)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return list_schedules(schedule_type=preset_name)
+    for day, slot, desc in data:
+        conn.execute(
+            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
+            (preset_name, day, slot, desc),
+        )
+    conn.commit()
+    result = list_schedules(schedule_type=preset_name)
+    conn.close()
+    return result
 
 
 def init_clinic() -> list[Schedule]:
-    conn = get_db()
-    existing = conn.execute("SELECT id FROM schedules WHERE type = 'clinic'").fetchone()
-    if existing:
-        conn.close()
-        return list_schedules(schedule_type="clinic")
-    for day, slot, desc in _DEFAULT_CLINIC:
-        conn.execute(
-            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
-            ("clinic", day, slot, desc),
-        )
-    conn.commit()
-    result = list_schedules(schedule_type="clinic")
-    conn.close()
-    return result
+    return _init_preset("clinic")
+
+
+def init_ask() -> list[Schedule]:
+    return _init_preset("ask")
+
+
+def init_practice() -> list[Schedule]:
+    return _init_preset("practice")
+
+
+def init_journal() -> list[Schedule]:
+    return _init_preset("journal")
 
 
 def add_schedule(schedule_type: str, day: str, time_slot: str, description: str = "") -> Schedule:
@@ -163,57 +148,6 @@ def today_schedules_for(day_name: str) -> list[Schedule]:
     ).fetchall()
     conn.close()
     return [Schedule(**dict(r)) for r in rows]
-
-
-def init_ask() -> list[Schedule]:
-    conn = get_db()
-    existing = conn.execute("SELECT id FROM schedules WHERE type = 'ask'").fetchone()
-    if existing:
-        conn.close()
-        return list_schedules(schedule_type="ask")
-    for day, slot, desc in _DEFAULT_ASK:
-        conn.execute(
-            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
-            ("ask", day, slot, desc),
-        )
-    conn.commit()
-    result = list_schedules(schedule_type="ask")
-    conn.close()
-    return result
-
-
-def init_practice() -> list[Schedule]:
-    conn = get_db()
-    existing = conn.execute("SELECT id FROM schedules WHERE type = 'practice'").fetchone()
-    if existing:
-        conn.close()
-        return list_schedules(schedule_type="practice")
-    for day, slot, desc in _DEFAULT_PRACTICE:
-        conn.execute(
-            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
-            ("practice", day, slot, desc),
-        )
-    conn.commit()
-    result = list_schedules(schedule_type="practice")
-    conn.close()
-    return result
-
-
-def init_journal() -> list[Schedule]:
-    conn = get_db()
-    existing = conn.execute("SELECT id FROM schedules WHERE type = 'journal'").fetchone()
-    if existing:
-        conn.close()
-        return list_schedules(schedule_type="journal")
-    for day, slot, desc in _DEFAULT_JOURNAL:
-        conn.execute(
-            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
-            ("journal", day, slot, desc),
-        )
-    conn.commit()
-    result = list_schedules(schedule_type="journal")
-    conn.close()
-    return result
 
 
 def check_remind() -> list[Schedule]:

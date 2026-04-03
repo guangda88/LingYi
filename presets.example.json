@@ -1,0 +1,22 @@
+{
+  "schedules": {
+    "clinic": [
+      {"day": "Tuesday", "time_slot": "morning", "description": "XX医院"},
+      {"day": "Thursday", "time_slot": "afternoon", "description": "XX门诊"}
+    ],
+    "ask": [
+      {"day": "Monday", "time_slot": "morning", "description": "频道更新 06:00"}
+    ],
+    "practice": [
+      {"day": "Monday", "time_slot": "morning", "description": "练功 06:00 至少30分钟"}
+    ],
+    "journal": [
+      {"day": "Monday", "time_slot": "evening", "description": "写日记 23:00"}
+    ]
+  },
+  "projects": [
+    {"name": "MyProject", "alias": "我的项目", "status": "active", "priority": "P1",
+     "category": "app", "description": "项目说明",
+     "repo": "myproject", "version": "v0.1.0", "energy_pct": 50}
+  ]
+}
