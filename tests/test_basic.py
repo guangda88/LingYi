@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + v0.11 双向语音 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + v0.11 双向语音 + v0.12 移动端 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.11.0"
+        assert __version__ == "0.12.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.11.0" in r.output
+        assert "0.12.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1641,3 +1641,84 @@ class TestVoiceCLI:
         runner = CliRunner()
         r = runner.invoke(cli, ["stt"])
         assert "不可用" in r.output
+
+
+# ── v0.12 移动端适配 ──────────────────────────────
+
+class TestMobile:
+    def test_detect_environment(self):
+        from lingyi.mobile import detect_environment
+        env = detect_environment()
+        assert env["type"] in ("desktop", "termux", "android")
+        assert isinstance(env["term_width"], int)
+        assert isinstance(env["is_compact"], bool)
+
+    def test_compact_output_short(self):
+        from lingyi.mobile import compact_output
+        text = "短文本"
+        assert compact_output(text, width=50) == "短文本"
+
+    def test_compact_output_long(self):
+        from lingyi.mobile import compact_output
+        text = "这是一段很长的文本需要被截断才能在小屏幕上显示"
+        result = compact_output(text, width=20)
+        assert len(result) <= 20
+        assert "…" in result
+
+    def test_compact_output_zero_width(self):
+        from lingyi.mobile import compact_output
+        assert compact_output("任何文本", width=0) == "任何文本"
+
+    def test_play_audio_no_player(self, monkeypatch):
+        monkeypatch.setattr("lingyi.mobile.detect_environment", lambda: {
+            "audio_player": None, "type": "desktop",
+        })
+        from lingyi.mobile import play_audio
+        assert play_audio("/fake/file.mp3") is False
+
+    def test_play_audio_file_not_found(self, monkeypatch):
+        monkeypatch.setattr("lingyi.mobile.detect_environment", lambda: {
+            "audio_player": "ffplay", "type": "desktop",
+        })
+        import subprocess
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw: (_ for _ in ()).throw(FileNotFoundError("no")))
+        from lingyi.mobile import play_audio
+        assert play_audio("/fake/file.mp3", player="ffplay") is False
+
+    def test_format_env_info(self):
+        from lingyi.mobile import format_env_info
+        env = {"type": "desktop", "is_termux": False, "is_compact": False,
+               "term_width": 120, "audio_player": "ffplay"}
+        text = format_env_info(env)
+        assert "desktop" in text
+        assert "120" in text
+        assert "ffplay" in text
+
+    def test_format_env_info_termux(self):
+        from lingyi.mobile import format_env_info
+        env = {"type": "termux", "is_termux": True, "is_compact": True,
+               "term_width": 45, "audio_player": "termux-media-player"}
+        text = format_env_info(env)
+        assert "termux" in text
+        assert "紧凑" in text
+        assert "已启用" in text
+
+    def test_detect_audio_player_none(self, monkeypatch):
+        monkeypatch.setattr("shutil.which", lambda name: None)
+        from lingyi.mobile import _detect_audio_player
+        assert _detect_audio_player() is None
+
+    def test_detect_audio_player_found(self, monkeypatch):
+        monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/mpv" if name == "mpv" else None)
+        from lingyi.mobile import _detect_audio_player
+        assert _detect_audio_player() == "mpv"
+
+
+class TestMobileCLI:
+    def test_env_cli(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["env"])
+        assert r.exit_code == 0
+        assert "环境信息" in r.output

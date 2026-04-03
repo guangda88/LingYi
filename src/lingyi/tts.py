@@ -8,6 +8,26 @@ from pathlib import Path
 DEFAULT_VOICE = "zh-CN-YunxiNeural"
 
 
+def _get_audio_player() -> list[str] | None:
+    """获取可用的音频播放命令。"""
+    from .mobile import detect_environment
+    env = detect_environment()
+    player = env["audio_player"]
+    if player is None:
+        return None
+    if player == "ffplay":
+        return ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"]
+    if player == "mpv":
+        return ["mpv", "--no-video", "--really-quiet"]
+    if player == "termux-media-player":
+        return ["termux-media-player", "play"]
+    if player == "play-audio":
+        return ["play-audio"]
+    if player in ("aplay", "paplay"):
+        return [player]
+    return [player]
+
+
 async def _synthesize(text: str, voice: str = DEFAULT_VOICE, output_path: str = "") -> str:
     if not text.strip():
         return ""
@@ -24,10 +44,10 @@ def speak(text: str, voice: str = DEFAULT_VOICE) -> bool:
     tmp.close()
     try:
         asyncio.run(_synthesize(text, voice, tmp.name))
-        subprocess.run(
-            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmp.name],
-            check=True,
-        )
+        cmd = _get_audio_player()
+        if cmd is None:
+            return False
+        subprocess.run(cmd + [tmp.name], check=True, capture_output=True, timeout=30)
         return True
     except Exception:
         return False
