@@ -1,5 +1,6 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + v0.11 双向语音 + v0.12 移动端 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + v0.11 双向语音 + v0.12 移动端 + v0.13 情报汇总 + 配置/巡检 测试。"""
 
+import json
 import os
 import sqlite3
 import tempfile
@@ -780,7 +781,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.12.0"
+        assert __version__ == "0.13.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +790,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.12.0" in r.output
+        assert "0.13.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1722,3 +1723,165 @@ class TestMobileCLI:
         r = runner.invoke(cli, ["env"])
         assert r.exit_code == 0
         assert "环境信息" in r.output
+
+
+# ── v0.13 情报汇总 ──────────────────────────────────
+
+class TestBriefing:
+    def test_collect_lingzhi_available(self, monkeypatch):
+        import json
+        class MockResp:
+            def read(self):
+                return json.dumps({
+                    "status": "ok", "version": "1.0.0",
+                    "categories": ["气功", "中医"],
+                    "stats": {"total": 100, "errors": 2},
+                }).encode()
+        monkeypatch.setattr("urllib.request.urlopen", lambda *a, **kw: MockResp())
+        from lingyi.briefing import collect_lingzhi
+        result = collect_lingzhi()
+        assert result["available"] is True
+        assert result["total_queries"] == 100
+        assert result["errors"] == 2
+        assert result["version"] == "1.0.0"
+
+    def test_collect_lingzhi_unavailable(self, monkeypatch):
+        from urllib.error import URLError
+        monkeypatch.setattr("urllib.request.urlopen",
+            lambda *a, **kw: (_ for _ in ()).throw(URLError("refused")))
+        from lingyi.briefing import collect_lingzhi
+        result = collect_lingzhi()
+        assert result["available"] is False
+
+    def test_collect_lingflow_with_data(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing._LINGFLOW_PATH", tmp_path)
+        fb_dir = tmp_path / ".lingflow" / "feedback"
+        fb_dir.mkdir(parents=True)
+        fb_file = fb_dir / "feedbacks.json"
+        fb_file.write_text('[{"status": "open"}, {"status": "closed"}]', encoding="utf-8")
+        trends_dir = tmp_path / ".lingflow" / "reports" / "github_trends"
+        trends_dir.mkdir(parents=True)
+        (trends_dir / "t1.json").write_text("{}", encoding="utf-8")
+        from lingyi.briefing import collect_lingflow
+        result = collect_lingflow()
+        assert result["available"] is True
+        assert result["feedback_count"] == 2
+        assert result["feedback_open"] == 1
+        assert result["github_trends"] == 1
+
+    def test_collect_lingflow_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing._LINGFLOW_PATH", tmp_path)
+        from lingyi.briefing import collect_lingflow
+        result = collect_lingflow()
+        assert result["available"] is True
+        assert result["feedback_count"] == 0
+        assert result["github_trends"] == 0
+
+    def test_collect_lingclaude_no_data(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing._LINGCLAUDE_PATH", tmp_path)
+        from lingyi.briefing import collect_lingclaude
+        result = collect_lingclaude()
+        assert result["available"] is True
+        assert result["sessions"] == 0
+
+    def test_collect_lingclaude_with_data(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing._LINGCLAUDE_PATH", tmp_path)
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        sessions = [{"query": "test query", "timestamp": "2026-04-03"}]
+        (data_dir / "session_history.json").write_text(
+            json.dumps(sessions), encoding="utf-8")
+        from lingyi.briefing import collect_lingclaude
+        result = collect_lingclaude()
+        assert result["available"] is True
+        assert result["sessions"] == 1
+        assert len(result["recent_queries"]) == 1
+
+    def test_format_briefing_full(self):
+        from lingyi.briefing import format_briefing
+        data = {
+            "timestamp": "2026-04-03T12:00:00",
+            "lingzhi": {"available": True, "version": "1.0", "categories": ["中医"],
+                         "total_queries": 50, "errors": 1},
+            "lingflow": {"available": True, "feedback_count": 3, "feedback_open": 1,
+                          "github_trends": 2, "optimization_reports": 5, "audits": []},
+            "lingclaude": {"available": True, "sessions": 10,
+                           "recent_queries": [{"query": "test", "timestamp": ""}]},
+        }
+        text = format_briefing(data)
+        assert "灵知" in text
+        assert "灵通" in text
+        assert "灵克" in text
+        assert "50" in text
+
+    def test_format_briefing_short(self):
+        from lingyi.briefing import format_briefing_short
+        data = {
+            "lingzhi": {"available": True, "total_queries": 100},
+            "lingflow": {"available": True, "feedback_count": 5, "feedback_open": 2},
+            "lingclaude": {"available": True, "sessions": 3},
+        }
+        text = format_briefing_short(data)
+        assert "灵知" in text
+        assert "灵通" in text
+        assert "灵克" in text
+        assert "100" in text
+
+    def test_format_briefing_all_unavailable(self):
+        from lingyi.briefing import format_briefing
+        data = {
+            "timestamp": "2026-04-03T12:00:00",
+            "lingzhi": {"available": False},
+            "lingflow": {"available": False},
+            "lingclaude": {"available": False},
+        }
+        text = format_briefing(data)
+        assert "不可用" in text
+
+
+class TestBriefingCLI:
+    def test_briefing_cli_full(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing.collect_lingzhi",
+            lambda: {"available": False})
+        monkeypatch.setattr("lingyi.briefing.collect_lingflow",
+            lambda: {"available": True, "feedback_count": 0, "feedback_open": 0,
+                     "github_trends": 0, "daily_reports": 0, "audits": [],
+                     "optimization_reports": 0})
+        monkeypatch.setattr("lingyi.briefing.collect_lingclaude",
+            lambda: {"available": True, "sessions": 0, "recent_queries": []})
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["briefing"])
+        assert r.exit_code == 0
+        assert "灵依情报汇报" in r.output
+
+    def test_briefing_cli_short(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing.collect_lingzhi",
+            lambda: {"available": True, "total_queries": 10})
+        monkeypatch.setattr("lingyi.briefing.collect_lingflow",
+            lambda: {"available": True, "feedback_count": 2, "feedback_open": 0,
+                     "github_trends": 0, "daily_reports": 0, "audits": [],
+                     "optimization_reports": 0})
+        monkeypatch.setattr("lingyi.briefing.collect_lingclaude",
+            lambda: {"available": True, "sessions": 5, "recent_queries": []})
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["briefing", "--short"])
+        assert r.exit_code == 0
+        assert "灵知" in r.output
+        assert "灵通" in r.output
+        assert "灵克" in r.output
+
+    def test_briefing_cli_source(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.briefing.collect_lingzhi",
+            lambda: {"available": True, "version": "1.0", "categories": ["中医"],
+                     "total_queries": 42, "errors": 0})
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["briefing", "--source", "lingzhi"])
+        assert r.exit_code == 0
+        assert "灵知" in r.output
+        assert "42" in r.output
