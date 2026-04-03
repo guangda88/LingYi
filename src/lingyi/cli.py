@@ -12,6 +12,7 @@ from .commands import pref as pref_cmds
 from .commands import chat as chat_cmds
 from .commands import connect as connect_cmds
 from .commands import digest as digest_cmds
+from .commands import voice as voice_cmds
 
 
 @click.group()
@@ -66,6 +67,7 @@ pref_cmds.register(pref)
 chat_cmds.register(cli)
 connect_cmds.register(cli)
 digest_cmds.register(cli)
+voice_cmds.register(cli)
 
 
 @cli.command("patrol")

@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + v0.9 信息整理 + v0.10 编程辅助深化 + v0.11 双向语音 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.10.0"
+        assert __version__ == "0.11.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.10.0" in r.output
+        assert "0.11.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1544,3 +1544,100 @@ class TestCodeCLI:
         r = runner.invoke(cli, ["refactor", "test.py"])
         assert r.exit_code == 0
         assert "灵克回答" in r.output
+
+
+# ── v0.11 双向语音 ──────────────────────────────────
+
+class TestSTT:
+    def test_check_stt_no_backend(self, monkeypatch):
+        import builtins
+        real_import = builtins.__import__
+        def mock_import(name, *a, **kw):
+            if name in ("whisper", "sherpa_onnx"):
+                raise ImportError("no")
+            return real_import(name, *a, **kw)
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        from lingyi.stt import check_stt
+        result = check_stt()
+        assert result["available"] is False
+        assert result["backends"] == []
+
+    def test_transcribe_file_not_found(self):
+        from lingyi.stt import transcribe_file
+        result = transcribe_file("/nonexistent.wav")
+        assert result["available"] is False
+        assert "不存在" in result["error"]
+
+    def test_transcribe_no_backend(self, monkeypatch):
+        import builtins
+        real_import = builtins.__import__
+        def mock_import(name, *a, **kw):
+            if name in ("whisper", "sherpa_onnx"):
+                raise ImportError("no")
+            return real_import(name, *a, **kw)
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        from lingyi.stt import transcribe_file
+        import tempfile
+        f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        f.write(b"fake audio")
+        f.close()
+        result = transcribe_file(f.name)
+        assert result["available"] is False
+        import os
+        os.unlink(f.name)
+
+    def test_format_stt_status_unavailable(self):
+        from lingyi.stt import format_stt_status
+        text = format_stt_status({"available": False, "backends": [], "default": None})
+        assert "不可用" in text
+
+    def test_format_stt_status_available(self):
+        from lingyi.stt import format_stt_status
+        text = format_stt_status({
+            "available": True, "default": "whisper",
+            "backends": [{"name": "whisper", "version": "1.0"}],
+        })
+        assert "可用" in text
+        assert "whisper" in text
+
+    def test_format_transcribe_success(self):
+        from lingyi.stt import format_transcribe_result
+        text = format_transcribe_result({"text": "你好", "available": True, "backend": "whisper"})
+        assert "你好" in text
+
+    def test_format_transcribe_empty(self):
+        from lingyi.stt import format_transcribe_result
+        text = format_transcribe_result({"text": "", "available": True, "backend": "whisper"})
+        assert "未识别" in text
+
+    def test_format_transcribe_fail(self):
+        from lingyi.stt import format_transcribe_result
+        text = format_transcribe_result({"text": "", "available": False, "backend": None, "error": "失败"})
+        assert "失败" in text
+
+    def test_record_audio_no_arecord(self, monkeypatch):
+        import subprocess
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw: (_ for _ in ()).throw(FileNotFoundError("no")))
+        from lingyi.stt import record_audio
+        result = record_audio(duration=1)
+        assert result is None
+
+
+class TestVoiceCLI:
+    def test_stt_status_cli(self, tmp_db):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["stt-status"])
+        assert r.exit_code == 0
+        assert ("可用" in r.output or "不可用" in r.output)
+
+    def test_stt_cli_no_backend(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.stt.check_stt", lambda: {
+            "available": False, "backends": [], "default": None,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["stt"])
+        assert "不可用" in r.output

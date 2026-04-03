@@ -239,7 +239,29 @@ lingyi refactor src/lingyi/schedule.py # 重构建议
 
 ---
 
-## v0.11+ 按需
+## v0.11 双向语音 ✅ 已完成
+
+**目标**：本地 STT + TTS，支持完全离线语音对话。
+
+|| 任务 | 产出 | 预计 |
+||------|------|------|
+|| STT模块 | `stt.py` 多后端支持（whisper/sherpa-onnx） | 1.5h |
+|| 语音对话 | `lingyi chat --voice` 语音输入模式 | 1h |
+|| CLI命令 | `lingyi stt` 录音转文字、`lingyi stt-status` | 30min |
+|| 测试 | 11个新测试 | 30min |
+
+**交付标准**：
+```bash
+lingyi stt-status                    # 查看STT后端状态
+lingyi stt --duration 5              # 录音5秒并转文字
+lingyi stt --file recording.wav      # 转录音频文件
+lingyi chat --voice                  # 语音对话模式
+lingyi chat --voice --voice-sec 8    # 8秒录音
+```
+
+---
+
+## v0.12+ 按需
 
 - 编程辅助深度集成
 - 双向语音对话（本地 STT + TTS，完全离线）
@@ -260,6 +282,7 @@ v0.7 智能   ~4h   ✅ 已完成
 v0.8 连接   ~4h   ✅ 已完成
 v0.9 整理   ~3h   ✅ 已完成
 v0.10 编程  ~3h   ✅ 已完成
+v0.11 语音  ~3h   ✅ 已完成
 
 合计 ~31h，按每周 8-12 小时，约三周完成 v0.3-v0.6。
 ```
