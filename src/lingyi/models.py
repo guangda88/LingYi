@@ -26,3 +26,20 @@ class Schedule:
     def day_index(self) -> int:
         order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         return order.index(self.day) if self.day in order else 7
+
+
+@dataclass
+class Project:
+    id: int | None = None
+    name: str = ""
+    alias: str = ""
+    status: str = "active"
+    priority: str = "P3"
+    category: str = "tool"
+    description: str = ""
+    repo: str = ""
+    version: str = ""
+    energy_pct: int = 0
+    notes: str = ""
+    created_at: str = ""
+    updated_at: str = ""

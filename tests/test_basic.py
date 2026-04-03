@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 测试。"""
 
 import os
 import sqlite3
@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from lingyi.db import get_db
-from lingyi.models import Memo, Schedule
+from lingyi.models import Memo, Schedule, Project
 
 
 @pytest.fixture
@@ -154,3 +154,129 @@ class TestCLI:
         assert "clinic" in r.output
         r = runner.invoke(cli, ["schedule", "week"])
         assert "本周排班" in r.output
+
+
+# ── v0.3 项目 ──────────────────────────────────────────
+
+class TestProject:
+    def test_init_projects(self, tmp_db):
+        from lingyi.project import init_projects
+        items = init_projects()
+        assert len(items) == 14
+        names = [p.name for p in items]
+        assert "LingFlow" in names
+        assert "灵知系统" in names
+
+    def test_init_projects_idempotent(self, tmp_db):
+        from lingyi.project import init_projects
+        items1 = init_projects()
+        items2 = init_projects()
+        assert len(items1) == len(items2) == 14
+
+    def test_add_project(self, tmp_db):
+        from lingyi.project import add_project
+        p = add_project("TestProj", alias="测试", priority="P1", category="core",
+                        description="测试项目", energy_pct=50)
+        assert p.id == 1
+        assert p.name == "TestProj"
+        assert p.alias == "测试"
+        assert p.priority == "P1"
+        assert p.energy_pct == 50
+
+    def test_list_projects(self, tmp_db):
+        from lingyi.project import init_projects, list_projects
+        init_projects()
+        all_projects = list_projects()
+        assert len(all_projects) == 14
+
+    def test_list_projects_by_status(self, tmp_db):
+        from lingyi.project import init_projects, list_projects
+        init_projects()
+        active = list_projects(status="active")
+        assert len(active) == 5
+        assert all(p.status == "active" for p in active)
+
+    def test_list_projects_by_category(self, tmp_db):
+        from lingyi.project import init_projects, list_projects
+        init_projects()
+        tools = list_projects(category="tool")
+        assert len(tools) == 6
+        assert all(p.category == "tool" for p in tools)
+
+    def test_show_project_by_name(self, tmp_db):
+        from lingyi.project import init_projects, show_project
+        init_projects()
+        p = show_project("LingFlow")
+        assert p is not None
+        assert p.alias == "灵通"
+
+    def test_show_project_by_alias(self, tmp_db):
+        from lingyi.project import init_projects, show_project
+        init_projects()
+        p = show_project("灵克")
+        assert p is not None
+        assert p.name == "LingClaude"
+
+    def test_show_project_not_found(self, tmp_db):
+        from lingyi.project import show_project
+        assert show_project("不存在") is None
+
+    def test_update_project(self, tmp_db):
+        from lingyi.project import init_projects, update_project, show_project
+        init_projects()
+        p = update_project("灵知", priority="P0", notes="重要")
+        assert p is not None
+        assert p.priority == "P0"
+        assert p.notes == "重要"
+        p2 = show_project("灵知系统")
+        assert p2.priority == "P0"
+
+    def test_update_project_not_found(self, tmp_db):
+        from lingyi.project import update_project
+        assert update_project("不存在", status="active") is None
+
+    def test_format_project_short(self, tmp_db):
+        from lingyi.project import init_projects, format_project_short, show_project
+        init_projects()
+        p = show_project("LingFlow")
+        text = format_project_short(p)
+        assert "LingFlow" in text
+        assert "灵通" in text
+        assert "活跃" in text
+
+    def test_format_project_detail(self, tmp_db):
+        from lingyi.project import init_projects, format_project_detail, show_project
+        init_projects()
+        p = show_project("LingYi")
+        text = format_project_detail(p)
+        assert "LingYi" in text
+        assert "灵依" in text
+        assert "优先级" in text
+
+    def test_format_project_kanban(self, tmp_db):
+        from lingyi.project import init_projects, format_project_kanban
+        init_projects()
+        text = format_project_kanban()
+        assert "活跃" in text
+        assert "维护" in text
+        assert "暂停" in text
+        assert "归档" in text
+        assert "LingFlow" in text
+
+    def test_project_cli(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_proj.db")
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["project", "init"])
+        assert r.exit_code == 0
+        assert "14" in r.output
+        r = runner.invoke(cli, ["project", "list"])
+        assert "LingFlow" in r.output
+        r = runner.invoke(cli, ["project", "show", "灵通"])
+        assert "LingFlow" in r.output
+        r = runner.invoke(cli, ["project", "list", "--status", "active"])
+        assert "LingFlow" in r.output
+        r = runner.invoke(cli, ["project", "show", "不存在"])
+        assert "不存在" in r.output

@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS schedules (
     is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    alias TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    priority TEXT NOT NULL DEFAULT 'P3',
+    category TEXT NOT NULL DEFAULT 'tool',
+    description TEXT DEFAULT '',
+    repo TEXT DEFAULT '',
+    version TEXT DEFAULT '',
+    energy_pct INTEGER DEFAULT 0,
+    notes TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
