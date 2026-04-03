@@ -29,6 +29,16 @@ _DEFAULT_ASK = [
     ("Friday", "morning", "灵通问道频道更新 06:00"),
 ]
 
+_DEFAULT_PRACTICE = [
+    ("Monday", "morning", "练功 06:00 至少30分钟"),
+    ("Tuesday", "morning", "练功 06:00 至少30分钟"),
+    ("Wednesday", "morning", "练功 06:00 至少30分钟"),
+    ("Thursday", "morning", "练功 06:00 至少30分钟"),
+    ("Friday", "morning", "练功 06:00 至少30分钟"),
+    ("Saturday", "morning", "练功 06:00 至少30分钟"),
+    ("Sunday", "morning", "练功 06:00 至少30分钟"),
+]
+
 
 def init_clinic() -> list[Schedule]:
     conn = get_db()
@@ -162,9 +172,31 @@ def init_ask() -> list[Schedule]:
     return result
 
 
+def init_practice() -> list[Schedule]:
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM schedules WHERE type = 'practice'").fetchone()
+    if existing:
+        conn.close()
+        return list_schedules(schedule_type="practice")
+    for day, slot, desc in _DEFAULT_PRACTICE:
+        conn.execute(
+            "INSERT INTO schedules (type, day, time_slot, description) VALUES (?, ?, ?, ?)",
+            ("practice", day, slot, desc),
+        )
+    conn.commit()
+    result = list_schedules(schedule_type="practice")
+    conn.close()
+    return result
+
+
 def check_remind() -> list[Schedule]:
     items = today_schedules()
     return [s for s in items if s.type == "clinic"]
+
+
+def check_practice_remind() -> list[Schedule]:
+    items = today_schedules()
+    return [s for s in items if s.type == "practice"]
 
 
 def check_tomorrow_ask() -> list[Schedule]:

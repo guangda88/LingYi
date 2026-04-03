@@ -125,6 +125,38 @@ class TestSchedule:
         else:
             assert len(clinics) == 0
 
+    def test_init_practice(self, tmp_db):
+        from lingyi.schedule import init_practice
+        items = init_practice()
+        assert len(items) == 7
+        assert items[0].type == "practice"
+        assert all("练功" in s.description for s in items)
+
+    def test_init_practice_idempotent(self, tmp_db):
+        from lingyi.schedule import init_practice
+        init_practice()
+        items2 = init_practice()
+        assert len(items2) == 7
+
+    def test_practice_remind(self, tmp_db):
+        from lingyi.schedule import init_practice, check_practice_remind
+        init_practice()
+        practice = check_practice_remind()
+        assert len(practice) == 1
+        assert "练功" in practice[0].description
+
+    def test_schedule_cli_practice(self, tmp_db, tmp_path, monkeypatch):
+        monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
+        monkeypatch.setattr("lingyi.db.DB_PATH", tmp_path / "cli_prac.db")
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["schedule", "init", "practice"])
+        assert r.exit_code == 0
+        assert "7" in r.output
+        r = runner.invoke(cli, ["schedule", "list", "--type", "practice"])
+        assert "练功" in r.output
+
 
 # ── CLI 集成测试 ─────────────────────────────────────
 

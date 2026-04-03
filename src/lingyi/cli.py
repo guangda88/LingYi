@@ -78,15 +78,18 @@ def schedule():
 @schedule.command("init")
 @click.argument("preset", default="clinic")
 def schedule_init(preset: str):
-    """初始化排班（clinic/ask）"""
+    """初始化排班（clinic/ask/practice）"""
     if preset == "clinic":
         items = sched_mod.init_clinic()
         click.echo(f"✓ 门诊排班已初始化（{len(items)}个时段）")
     elif preset == "ask":
         items = sched_mod.init_ask()
         click.echo(f"✓ 灵通问道排班已初始化（{len(items)}个时段）")
+    elif preset == "practice":
+        items = sched_mod.init_practice()
+        click.echo(f"✓ 练功排班已初始化（{len(items)}个时段）")
     else:
-        click.echo(f"未知预设：{preset}（可用：clinic, ask）")
+        click.echo(f"未知预设：{preset}（可用：clinic, ask, practice）")
 
 
 @schedule.command("add")
@@ -178,6 +181,12 @@ def schedule_week():
 @schedule.command("remind")
 def schedule_remind():
     """检查今日门诊 + 明日灵通问道"""
+    practice = sched_mod.check_practice_remind()
+    if practice:
+        click.echo(" Qi 今天早上练功至少30分钟！")
+    else:
+        click.echo("今天没有练功安排。")
+    click.echo()
     clinics = sched_mod.check_remind()
     if clinics:
         click.echo("⚠ 今天有门诊！")
