@@ -1,0 +1,11 @@
+*.db
+*.key
+.env
+__pycache__/
+*.pyc
+.lingflow/logs/
+.lingflow/sessions/
+.pytest_cache/
+*.egg-info/
+dist/
+build/

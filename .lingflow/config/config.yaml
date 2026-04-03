@@ -1,0 +1,32 @@
+# 灵依 LingYi - LingFlow 项目配置
+# 众智混元，万法灵通
+
+project:
+  name: 灵依
+  name_en: LingYi
+  version: 0.1.0
+  description: 灵依 - 你的私我AI助理
+
+workflow:
+  max_parallel: 4
+  max_iterations: 200
+
+skills:
+  path: skills
+  default_timeout: 60
+
+compression:
+  enabled: true
+  max_length: 5000
+
+agents:
+  default_agents:
+    - name: implementation
+      capabilities: [code_generation, testing, documentation]
+    - name: review
+      capabilities: [code_review, design_review, security_check]
+    - name: architecture
+      capabilities: [system_design, architecture_review, api_design]
+
+logging:
+  level: INFO
