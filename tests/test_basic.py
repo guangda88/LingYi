@@ -1,4 +1,4 @@
-"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + 配置/巡检 测试。"""
+"""v0.1 备忘录 + v0.2 日程 + v0.3 项目 + v0.4 计划 + v0.5 记忆 + v0.6 语音 + v0.7 智能 + v0.8 连接 + 配置/巡检 测试。"""
 
 import os
 import sqlite3
@@ -780,7 +780,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.7.0"
+        assert __version__ == "0.8.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -789,7 +789,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.7.0" in r.output
+        assert "0.8.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1134,3 +1134,156 @@ class TestWeeklyReport:
         r = runner.invoke(cli, ["report"])
         assert "周报" in r.output
         assert r.exit_code == 0
+
+
+# ── v0.8 连接：灵知/灵克 ─────────────────────────
+
+class TestAskKnowledge:
+    def test_ask_service_unavailable(self, monkeypatch):
+        from urllib.error import URLError
+        monkeypatch.setattr("lingyi.ask._request", lambda *a, **kw: (_ for _ in ()).throw(URLError("refused")))
+        from lingyi.ask import ask_knowledge
+        result = ask_knowledge("什么是气功")
+        assert result["available"] is False
+        assert "不可用" in result["answer"]
+
+    def test_ask_success(self, monkeypatch):
+        monkeypatch.setattr("lingyi.ask._request", lambda url, data=None: {
+            "answer": "气功是一种传统修炼方法",
+            "sources": [{"title": "气功基础", "content": "调身调息调心"}],
+            "session_id": "test123",
+        })
+        from lingyi.ask import ask_knowledge
+        result = ask_knowledge("什么是气功")
+        assert result["available"] is True
+        assert "气功" in result["answer"]
+        assert len(result["sources"]) == 1
+
+    def test_ask_with_category(self, monkeypatch):
+        captured = {}
+        def mock_request(url, data=None):
+            captured["data"] = data
+            captured["url"] = url
+            return {"answer": "中医结果", "sources": [], "session_id": "t"}
+        monkeypatch.setattr("lingyi.ask._request", mock_request)
+        from lingyi.ask import ask_knowledge
+        ask_knowledge("经络", category="中医")
+        assert "中医" in str(captured.get("data", ""))
+
+    def test_check_lingzhi_available(self, monkeypatch):
+        monkeypatch.setattr("lingyi.ask._request", lambda url, data=None: {"status": "ok"})
+        from lingyi.ask import check_lingzhi
+        result = check_lingzhi()
+        assert result["available"] is True
+
+    def test_check_lingzhi_unavailable(self, monkeypatch):
+        from urllib.error import URLError
+        monkeypatch.setattr("lingyi.ask._request", lambda *a, **kw: (_ for _ in ()).throw(URLError("no")))
+        from lingyi.ask import check_lingzhi
+        result = check_lingzhi()
+        assert result["available"] is False
+
+    def test_format_ask_result_available(self):
+        from lingyi.ask import format_ask_result
+        data = {"available": True, "answer": "这是答案", "sources": [{"title": "T", "content": "C"}]}
+        text = format_ask_result(data)
+        assert "灵知回答" in text
+        assert "这是答案" in text
+
+    def test_format_ask_result_unavailable(self):
+        from lingyi.ask import format_ask_result
+        text = format_ask_result({"available": False, "answer": "灵知服务不可用。"})
+        assert "⚠" in text
+
+
+class TestAskCode:
+    def test_code_sdk_unavailable(self, monkeypatch):
+        import builtins
+        real_import = builtins.__import__
+        def mock_import(name, *a, **kw):
+            if name == "lingclaude":
+                raise ImportError("no sdk")
+            return real_import(name, *a, **kw)
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        from lingyi.code import check_lingclaude
+        result = check_lingclaude()
+        assert result["available"] is False
+
+    def test_code_ask_unavailable(self, monkeypatch):
+        import builtins
+        real_import = builtins.__import__
+        def mock_import(name, *a, **kw):
+            if name == "lingclaude":
+                raise ImportError("no")
+            return real_import(name, *a, **kw)
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        from lingyi.code import ask_code
+        result = ask_code("帮我检查代码")
+        assert result["available"] is False
+
+    def test_format_code_result_available(self):
+        from lingyi.code import format_code_result
+        data = {"available": True, "answer": "代码没有问题"}
+        text = format_code_result(data)
+        assert "灵克回答" in text
+        assert "代码没有问题" in text
+
+    def test_format_code_result_unavailable(self):
+        from lingyi.code import format_code_result
+        text = format_code_result({"available": False, "answer": "灵克不可用"})
+        assert "⚠" in text
+
+
+class TestConnectCLI:
+    def test_ask_cli(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.ask.ask_knowledge", lambda q, **kw: {
+            "answer": f"关于{q}的回答", "sources": [], "available": True,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["ask", "什么是气功"])
+        assert r.exit_code == 0
+        assert "灵知回答" in r.output
+
+    def test_ask_cli_with_category(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.ask.ask_knowledge", lambda q, **kw: {
+            "answer": "中医答案", "sources": [], "available": True,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["ask", "经络", "--category", "中医"])
+        assert r.exit_code == 0
+        assert "灵知回答" in r.output
+
+    def test_ask_cli_unavailable(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.ask.ask_knowledge", lambda q, **kw: {
+            "answer": "灵知服务不可用。", "sources": [], "available": False,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["ask", "测试"])
+        assert "⚠" in r.output
+
+    def test_code_cli(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.code.ask_code", lambda q, **kw: {
+            "answer": "代码建议", "available": True,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["code", "帮我检查代码"])
+        assert r.exit_code == 0
+        assert "灵克回答" in r.output
+
+    def test_code_cli_unavailable(self, tmp_db, monkeypatch):
+        monkeypatch.setattr("lingyi.code.ask_code", lambda q, **kw: {
+            "answer": "灵克不可用", "available": False,
+        })
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["code", "测试"])
+        assert "⚠" in r.output

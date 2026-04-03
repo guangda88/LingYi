@@ -10,6 +10,7 @@ from .commands import plan as plan_cmds
 from .commands import session as session_cmds
 from .commands import pref as pref_cmds
 from .commands import chat as chat_cmds
+from .commands import connect as connect_cmds
 
 
 @click.group()
@@ -62,6 +63,7 @@ plan_cmds.register(plan)
 session_cmds.register(session)
 pref_cmds.register(pref)
 chat_cmds.register(cli)
+connect_cmds.register(cli)
 
 
 @cli.command("patrol")
