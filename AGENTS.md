@@ -1,6 +1,6 @@
 # AGENTS.md — LingYi (灵依) Codebase Guide
 
-> **灵依 LingYi** — A private AI assistant (CLI-first). Manages schedules, memos, projects, plans, sessions, preferences, TTS voice output, and smart reminders/reports. Current version: **v0.7.0**.
+> **灵依 LingYi** — A private AI assistant (CLI-first). Manages schedules, memos, projects, plans, sessions, preferences, TTS/STT voice I/O, smart reminders, weekly reports, knowledge retrieval, code assistance, content digestion, mobile support, and briefing summaries. Current version: **v0.13.0**.
 
 ---
 
@@ -11,6 +11,7 @@
 - **Database**: SQLite (stored at `~/.lingyi/lingyi.db`)
 - **User Config**: `~/.lingyi/presets.json` (private, not in git)
 - **TTS Engine**: edge-tts (Microsoft, free)
+- **STT Engine**: Whisper (OpenAI, local)
 - **Build System**: setuptools via `pyproject.toml`
 
 This is a **personal tool**, not a public product. The design philosophy is: simplicity over elegance, running over perfect architecture, daily-use over feature-completeness.
@@ -30,14 +31,17 @@ lingyi schedule today
 lingyi schedule remind --smart
 lingyi report
 lingyi patrol
+lingyi ask "什么是气功"
+lingyi code "写一个排序函数"
+lingyi digest ~/notes.txt
+lingyi briefing
+lingyi stt recording.wav
 
 # Run tests
 pytest                          # All tests (configured via pyproject.toml, testpaths=["tests"])
 pytest tests/test_basic.py      # Specific test file
 pytest -x                       # Stop on first failure
 pytest -k TestMemo              # Run specific test class
-
-# No separate lint command observed — no linter configured in pyproject.toml
 ```
 
 ---
@@ -47,7 +51,7 @@ pytest -k TestMemo              # Run specific test class
 ```
 LingYi/
 ├── src/lingyi/                  # Main package
-│   ├── __init__.py              # Version (0.7.0)
+│   ├── __init__.py              # Version (0.13.0)
 │   ├── cli.py                   # CLI entry point — Click group + command registration
 │   ├── models.py                # Dataclasses: Memo, Schedule, Project, Plan, Session
 │   ├── db.py                    # SQLite connection, schema (6 tables), get_db()
@@ -59,8 +63,14 @@ LingYi/
 │   ├── session.py               # Session summary CRUD (for cross-session memory)
 │   ├── pref.py                  # Key-value preference persistence
 │   ├── report.py                # Weekly report generation (v0.7)
-│   ├── tts.py                   # TTS via edge-tts + ffplay playback
+│   ├── tts.py                   # TTS via edge-tts + ffplay playback (v0.6)
+│   ├── stt.py                   # STT via Whisper for transcription (v0.11)
 │   ├── patrol.py                # Git-based project patrol/reporting
+│   ├── ask.py                   # 灵知 REST API client with medical query guardrail (v0.8)
+│   ├── code.py                  # 灵克 LingClaude code assistance client (v0.10)
+│   ├── digest.py                # Content digestion and summarization (v0.9)
+│   ├── briefing.py              # Daily briefing aggregation (v0.13)
+│   ├── mobile.py                # Mobile device support (v0.12)
 │   └── commands/                # CLI subcommand modules (one file per domain)
 │       ├── __init__.py
 │       ├── memo.py              #   Memo CLI commands
@@ -69,20 +79,26 @@ LingYi/
 │       ├── plan.py              #   Plan CLI commands
 │       ├── session.py           #   Session CLI commands
 │       ├── pref.py              #   Preference CLI commands
-│       └── chat.py              #   Interactive chat mode
+│       ├── chat.py              #   Interactive chat mode (v0.6)
+│       ├── connect.py           #   Ask/Code CLI commands (v0.8)
+│       ├── digest.py            #   Digest CLI commands (v0.9)
+│       ├── briefing.py          #   Briefing CLI commands (v0.13)
+│       ├── voice.py             #   Voice I/O CLI commands (v0.11)
+│       └── mobile.py            #   Mobile CLI commands (v0.12)
 ├── tests/
 │   ├── __init__.py
-│   ├── test_basic.py            # All tests in one file (129 tests)
+│   ├── test_basic.py            # All tests in one file (211 tests)
 │   └── test_presets.json        # Test fixture presets data
 ├── docs/                        # Documentation
 │   ├── MISSION.md               # Charter, values, boundaries
 │   ├── DEVELOPMENT_PRINCIPLES.md# 10 development principles
-│   ├── DEVELOPMENT_PLAN.md      # Version roadmap (v0.1–v0.9+)
+│   ├── DEVELOPMENT_PLAN.md      # Version roadmap (v0.1–v0.14+)
 │   ├── PRD.md                   # Product requirements
-│   └── USER_PROFILE.md          # User profile
+│   ├── USER_PROFILE.md          # User profile
+│   └── AUDIT_REPORT_v0.13.md   # v0.13 audit report
 ├── presets.example.json         # Template for user config (committed)
 ├── pyproject.toml               # Build config, dependencies, pytest config
-└── .lingflow/                   # LingFlow workspace (logs, config, sessions)
+└── .lingflow/                   # LingFlow workspace (gitignored)
 ```
 
 ---
@@ -128,6 +144,12 @@ Each command module defines a top-level `register(group)` function that uses dec
 
 All models are `@dataclass` in `models.py` with `id: int | None = None` and timestamp fields. Conversion from DB row: `Memo(**dict(row))`.
 
+### External Service Pattern
+
+- **ask.py**: REST API client for 灵知 (knowledge base) via `urllib`. Medical query guardrail via `_is_medical_query()`.
+- **code.py**: Client for 灵克 LingClaude (code assistance). Graceful fallback when SDK unavailable.
+- **briefing.py**: Aggregates data from multiple services. Each external call wrapped in try/except with graceful degradation.
+
 ---
 
 ## Database Schema (6 tables)
@@ -156,9 +178,9 @@ All models are `@dataclass` in `models.py` with `id: int | None = None` and time
 
 ## Testing Approach
 
-- **Single test file**: `tests/test_basic.py` contains all 129 tests
+- **Single test file**: `tests/test_basic.py` contains all 211 tests
 - **Fixture `tmp_db`**: Creates temp DB via `monkeypatch` on `lingyi.db.DB_DIR` and `lingyi.db.DB_PATH`, patches `lingyi.config.PRESETS_PATH` to `tests/test_presets.json`
-- **Test categories**: Unit tests per domain (Memo, Schedule, Project, Plan, Session, Pref, TTS, Chat, SmartRemind, WeeklyReport) + CLI integration tests (using `click.testing.CliRunner`)
+- **Test categories**: Unit tests per domain (Memo, Schedule, Project, Plan, Session, Pref, TTS, STT, Chat, SmartRemind, WeeklyReport, AskKnowledge, AskCode, Digest, Briefing, Mobile, Voice) + CLI integration tests
 - **Test data**: `tests/test_presets.json` has simplified schedule/project/patrol data
 - **Philosophy**: "核心路径有测试" — critical modules must have tests; no 100% coverage target
 
@@ -187,9 +209,9 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 ## Gotchas & Non-Obvious Patterns
 
 ### Private Config Not in Git
-- `~/.lingyi/presets.json` contains real schedule data (hospital names, etc.) and is gitignored
+- `~/.lingyi/presets.json` contains real schedule data and is gitignored
 - `presets.example.json` is the template with placeholder data
-- Tests use `tests/test_presets.json` with real-ish data
+- Tests use `tests/test_presets.json` with test data
 
 ### Schedule Day Names
 - Days stored as full English names: `"Monday"`, `"Tuesday"`, etc.
@@ -200,6 +222,11 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 - `医疗`, `编程`, `研究`, `论文`, `学术`
 - Default area is `编程`
 
+### Medical Query Guardrail (v0.8+)
+- `ask.py` blocks medical queries (诊断/辨证/方剂/处方/怎么治/吃什么药/治疗方案)
+- Charter principle: "不碰医学知识检索" — over-blocking is intentional
+- `connect.py` CLI does not list `中医` as a category
+
 ### Project Lookup
 - `show_project()` and `update_project()` accept **name OR alias** (case-insensitive via `COLLATE NOCASE`)
 - e.g., `lingyi project show 灵通` finds `LingFlow`
@@ -207,13 +234,14 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 ### Init Idempotency
 - `schedule init <preset>` and `project init` check if data already exists before inserting — safe to run multiple times
 
-### TTS Dependency
+### TTS/STT Dependencies
 - `edge-tts` is a runtime dependency
 - `ffplay` (from ffmpeg) is needed for actual audio playback — `speak()` silently returns `False` if unavailable
+- `whisper` is needed for STT — `transcribe()` gracefully degrades if unavailable
 - `synthesize_to_file()` writes MP3 without needing ffplay
 
 ### Chat Mode
-- `lingyi chat` is a simple keyword-based interactive loop (no LLM integration yet)
+- `lingyi chat` is a keyword-based interactive loop
 - Keyword matching: "今天/日程/安排" → schedule, "备忘/记一下/提醒我" → memo, etc.
 
 ### DB Connection Handling
@@ -222,13 +250,16 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 
 ### Smart Remind (v0.7)
 - `schedule remind --smart` uses `smart_remind()` in `schedule.py`
-- Combines: today's schedule + user preferences (filtered by 提醒/习惯/注意 keywords) + last session's todos
-- Generates contextual suggestions (e.g., "today has clinic, prepare case files")
+- Combines: today's schedule + user preferences + last session's todos
+- Generates contextual suggestions
 
 ### Weekly Report (v0.7)
 - `lingyi report` uses `report.py` module
 - Aggregates: week schedule + plan stats + recent memos + active projects + recent sessions
-- Plan stats show completion rate per area
+
+### Briefing (v0.13)
+- `lingyi briefing` aggregates: weather + schedule + tasks + project status + recent memos
+- Each external call wrapped in try/except — graceful degradation when services unavailable
 
 ---
 
@@ -238,9 +269,10 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 |------|---------|
 | `docs/MISSION.md` | Charter — mission, values (prioritized), boundaries, related projects |
 | `docs/DEVELOPMENT_PRINCIPLES.md` | 10 development principles — the "rules of the road" |
-| `docs/DEVELOPMENT_PLAN.md` | Version roadmap v0.1–v0.9+ with estimates |
+| `docs/DEVELOPMENT_PLAN.md` | Version roadmap v0.1–v0.14+ with estimates |
 | `docs/PRD.md` | Product requirements document |
 | `docs/USER_PROFILE.md` | User profile context |
+| `docs/AUDIT_REPORT_v0.13.md` | v0.13 audit against charter and principles |
 
 ### Core Values (Priority Order)
 1. **守界** (Boundaries) — Don't cross into medical diagnosis, don't make decisions for the user
@@ -251,8 +283,13 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 
 ### Related Projects
 - **灵通 LingFlow** — Multi-agent workflow engine at `/home/ai/LingFlow` (v3.8.0), used as development tool
-- **灵知系统** — Knowledge base (planned REST API integration in v0.8)
+- **灵知系统** — Knowledge base with REST API (integrated since v0.8)
 - **灵克 LingClaude** — Local AI coding model at `/home/ai/LingClaude`
+- **智桥 Zhineng-Bridge** — Relay service at port 8080 bridging LingYi to LingZhi
+
+### Port Mapping
+- **8000**: 灵知 (LingZhi) — FastAPI knowledge system
+- **8080**: 智桥 (Zhineng-Bridge) — Relay/bridge service
 
 ---
 
@@ -267,5 +304,11 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 | v0.5 | 记忆 (Memory) | Session summaries, preference persistence |
 | v0.6 | 语音 (Voice) | TTS playback (`--speak`), interactive chat mode |
 | v0.7 | 智能 (Smart) | Smart reminders (`--smart`), weekly report (`lingyi report`) |
+| v0.8 | 连接 (Connect) | 灵知 REST API integration, medical query guardrail |
+| v0.9 | 信息整理 (Digest) | Content digestion, summarization, file ingestion |
+| v0.10 | 编程辅助深化 | Code assistance via 灵克, code review, refactoring |
+| v0.11 | 双向语音 | STT via Whisper, voice CLI commands |
+| v0.12 | 移动端 | Mobile device support, remote access |
+| v0.13 | 情报汇总 (Briefing) | Daily briefing aggregation, multi-source summary |
 
-**Next up**: v0.8 连接 (Connect) — 灵知 REST API, 灵克 integration
+**Next up**: v0.14+ — see DEVELOPMENT_PLAN.md for roadmap

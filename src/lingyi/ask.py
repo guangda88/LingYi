@@ -30,18 +30,31 @@ def check_lingzhi(base_url: str = _DEFAULT_BASE_URL) -> dict:
         return {"available": False, "status": "unreachable"}
 
 
+def _is_medical_query(question: str) -> bool:
+    """检查是否为医疗诊断类查询（宪章边界：不碰医学知识检索）。"""
+    _MEDICAL_KW = ("诊断", "辨证", "方剂", "处方", "怎么治", "吃什么药", "治疗方案")
+    q = question.lower()
+    return any(kw in q for kw in _MEDICAL_KW)
+
+
 def ask_knowledge(question: str, category: str | None = None,
                   base_url: str = _DEFAULT_BASE_URL) -> dict:
     """向灵知提问，返回答案和来源。
 
     Args:
         question: 问题
-        category: 可选分类（气功/中医/儒家/佛家/道家/武术/哲学/科学/心理学）
+        category: 可选分类（气功/儒家/佛家/道家/武术/哲学/科学/心理学）
         base_url: 灵知服务地址
 
     Returns:
         {"answer": str, "sources": list, "available": bool}
     """
+    if _is_medical_query(question):
+        return {
+            "answer": "⚠ 灵依不做医学知识检索，请咨询专业医师。",
+            "sources": [], "available": False,
+        }
+
     payload = {"question": question}
     if category:
         payload["category"] = category
@@ -69,6 +82,9 @@ def search_knowledge(query: str, category: str | None = None,
     Returns:
         {"results": list, "total": int, "available": bool}
     """
+    if _is_medical_query(query):
+        return {"results": [], "total": 0, "available": False}
+
     params = f"?query={query}&top_k={top_k}"
     if category:
         params += f"&category={category}"

@@ -1196,6 +1196,33 @@ class TestAskKnowledge:
         text = format_ask_result({"available": False, "answer": "灵知服务不可用。"})
         assert "⚠" in text
 
+    def test_ask_medical_query_blocked(self):
+        from lingyi.ask import ask_knowledge
+        result = ask_knowledge("这个症状怎么治疗")
+        assert result["available"] is False
+        assert "医学" in result["answer"]
+        assert result["sources"] == []
+
+    def test_search_medical_query_blocked(self):
+        from lingyi.ask import search_knowledge
+        result = search_knowledge("感冒吃什么药")
+        assert result["available"] is False
+        assert result["results"] == []
+        assert result["total"] == 0
+
+    def test_ask_prescription_blocked(self):
+        from lingyi.ask import ask_knowledge
+        result = ask_knowledge("帮我开个处方")
+        assert result["available"] is False
+
+    def test_ask_non_medical_passes(self, monkeypatch):
+        monkeypatch.setattr("lingyi.ask._request", lambda url, data=None: {
+            "answer": "气功养生", "sources": [], "session_id": "t",
+        })
+        from lingyi.ask import ask_knowledge
+        result = ask_knowledge("气功有哪些流派")
+        assert result["available"] is True
+
 
 class TestAskCode:
     def test_code_sdk_unavailable(self, monkeypatch):

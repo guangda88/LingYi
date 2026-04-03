@@ -18,7 +18,8 @@ def register(group: click.Group):
         """整理文本，提取待办/决策/偏好/要点"""
         if file_path:
             try:
-                content = open(file_path, encoding="utf-8").read()
+                with open(file_path, encoding="utf-8") as f:
+                    content = f.read()
             except FileNotFoundError:
                 click.echo(f"文件不存在: {file_path}")
                 return

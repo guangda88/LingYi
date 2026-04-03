@@ -1,7 +1,5 @@
 """交互式对话模式。"""
 
-import sys
-
 import click
 
 from ..tts import speak, clean_text_for_speech
