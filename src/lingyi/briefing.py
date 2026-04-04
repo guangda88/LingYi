@@ -22,7 +22,6 @@
 
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -193,16 +192,16 @@ def format_briefing(data: dict, compact: bool = False) -> str:
 
     lingzhi = data.get("lingzhi", {})
     if lingzhi.get("available"):
-        lines.append(f"\n🔮 灵知知识系统")
+        lines.append("\n🔮 灵知知识系统")
         lines.append(f"  状态: 运行中  版本: {lingzhi.get('version', '?')}")
         lines.append(f"  分类: {', '.join(lingzhi.get('categories', []))}")
         lines.append(f"  累计查询: {lingzhi.get('total_queries', 0)}  错误: {lingzhi.get('errors', 0)}")
     else:
-        lines.append(f"\n🔮 灵知知识系统: 不可用")
+        lines.append("\n🔮 灵知知识系统: 不可用")
 
     lingflow = data.get("lingflow", {})
     if lingflow.get("available"):
-        lines.append(f"\n🔧 灵通开发平台")
+        lines.append("\n🔧 灵通开发平台")
         fb = lingflow.get("feedback_count", 0)
         fb_open = lingflow.get("feedback_open", 0)
         lines.append(f"  反馈: {fb} 条（{fb_open} 条待处理）")
@@ -216,11 +215,11 @@ def format_briefing(data: dict, compact: bool = False) -> str:
         if audits:
             lines.append(f"  最近审计: {', '.join(audits[:3])}")
     else:
-        lines.append(f"\n🔧 灵通开发平台: 不可用")
+        lines.append("\n🔧 灵通开发平台: 不可用")
 
     lingclaude = data.get("lingclaude", {})
     if lingclaude.get("available"):
-        lines.append(f"\n💻 灵克编程助手")
+        lines.append("\n💻 灵克编程助手")
         sessions = lingclaude.get("sessions", 0)
         lines.append(f"  会话记录: {sessions} 条")
         recent = lingclaude.get("recent_queries", [])
@@ -230,11 +229,11 @@ def format_briefing(data: dict, compact: bool = False) -> str:
                 query_text = q.get("query", "")[:50]
                 lines.append(f"    - {query_text}")
     else:
-        lines.append(f"\n💻 灵克编程助手: 不可用")
+        lines.append("\n💻 灵克编程助手: 不可用")
 
     lingtongask = data.get("lingtongask", {})
     if lingtongask.get("available"):
-        lines.append(f"\n🎙️ 灵通问道")
+        lines.append("\n🎙️ 灵通问道")
         total_comments = lingtongask.get("total_comments", 0)
         total_messages = lingtongask.get("total_messages", 0)
         unique_users = lingtongask.get("unique_users", 0)
@@ -262,7 +261,7 @@ def format_briefing(data: dict, compact: bool = False) -> str:
         if top_fans:
             lines.append(f"  活跃粉丝: {', '.join([f.get('name', '未知') for f in top_fans[:3]])}")
     else:
-        lines.append(f"\n🎙️ 灵通问道: 不可用")
+        lines.append("\n🎙️ 灵通问道: 不可用")
 
     return "\n".join(lines)
 

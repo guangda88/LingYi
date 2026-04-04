@@ -75,13 +75,11 @@ def _today() -> str:
 
 
 def _msg_id() -> str:
-    ts = _today()
     ms = _now().replace("-", "").replace("T", "").replace(":", "")
     return f"msg_{ms}"
 
 
 def _disc_id() -> str:
-    ts = _today()
     ms = _now().replace("-", "").replace("T", "").replace(":", "")
     return f"disc_{ms}"
 
@@ -102,14 +100,20 @@ def _load_index(store: Path) -> list:
     if not idx_path.exists():
         return []
     try:
-        return json.loads(idx_path.read_text(encoding="utf-8"))
+        data = json.loads(idx_path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("threads", data.get("discussions", []))
+        return []
     except Exception:
         return []
 
 
 def _save_index(store: Path, index: list) -> None:
     idx_path = store / "index.json"
-    idx_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    data = {"threads": index, "last_updated": _now()}
+    idx_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _load_discussion(store: Path, disc_id: str) -> Optional[dict]:
@@ -129,20 +133,22 @@ def _save_discussion(store: Path, disc: dict) -> None:
 
 def _update_index_entry(store: Path, disc: dict) -> None:
     index = _load_index(store)
+    disc_id = disc.get("id") or disc.get("thread_id", "")
     entry = {
-        "id": disc["id"],
-        "topic": disc["topic"],
-        "initiator": disc["initiator"],
+        "id": disc_id,
+        "topic": disc.get("topic", ""),
+        "initiator": disc.get("initiator", ""),
         "participants": disc.get("participants", []),
         "message_count": len(disc.get("messages", [])),
         "status": disc.get("status", "open"),
-        "created_at": disc["created_at"],
-        "updated_at": disc["updated_at"],
+        "created_at": disc.get("created_at", ""),
+        "updated_at": disc.get("updated_at", ""),
         "summary": disc.get("summary", ""),
     }
     found = False
     for i, item in enumerate(index):
-        if item["id"] == disc["id"]:
+        item_id = item.get("id") or item.get("thread_id", "")
+        if item_id == disc_id:
             index[i] = entry
             found = True
             break
@@ -171,6 +177,45 @@ def init_store() -> dict:
     return {"initialized": True, "store": str(store)}
 
 
+def _ping_notify(from_id: str, disc_id: str, topic: str) -> None:
+    """通知在线服务有新灵信消息。"""
+    import urllib.request
+    import urllib.error
+
+    payload = json.dumps({
+        "event": "new_message",
+        "from": from_id,
+        "discussion_id": disc_id,
+        "topic": topic,
+        "timestamp": _now(),
+    }, ensure_ascii=False).encode("utf-8")
+
+    targets = [
+        ("灵知", "http://127.0.0.1:8000/api/v1/lingmessage/notify"),
+        ("灵依", "https://127.0.0.1:8900/api/lingmessage/notify"),
+        ("灵克", "http://127.0.0.1:8700/api/lingmessage/notify"),
+    ]
+    for name, url in targets:
+        try:
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            ctx = None
+            if url.startswith("https"):
+                import ssl
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = 0
+            urllib.request.urlopen(req, context=ctx, timeout=3)
+            logger.debug(f"通知 {name} 成功")
+        except urllib.error.HTTPError as e:
+            logger.debug(f"通知 {name} 返回 {e.code}")
+        except Exception as e:
+            logger.debug(f"通知 {name} 失败: {e}")
+
+
 def send_message(from_id: str, topic: str, content: str,
                  reply_to: Optional[str] = None,
                  tags: Optional[list] = None) -> Message:
@@ -191,8 +236,8 @@ def send_message(from_id: str, topic: str, content: str,
     index = _load_index(store)
     disc_id = None
     for item in index:
-        if item["topic"] == topic and item["status"] == "open":
-            disc_id = item["id"]
+        if item.get("topic") == topic and item.get("status") == "open":
+            disc_id = item.get("id") or item.get("thread_id", "")
             break
 
     if disc_id:
@@ -216,9 +261,12 @@ def send_message(from_id: str, topic: str, content: str,
             status="open",
             messages=[asdict(msg)],
         )
-        _save_discussion(store, asdict(disc))
-        _update_index_entry(store, asdict(disc))
+        disc_data = asdict(disc)
+        _save_discussion(store, disc_data)
+        _update_index_entry(store, disc_data)
+        disc_id = disc_data["id"]
 
+    _ping_notify(from_id, disc_id, topic)
     return msg
 
 
@@ -316,7 +364,8 @@ def format_discussion_list(discussions: list) -> str:
         count = d.get("message_count", 0)
         parts = ", ".join(d.get("participants", []))
         updated = d.get("updated_at", "")[:16].replace("T", " ")
-        lines.append(f"\n{status_icon} [{d['id'][:20]}...] {d['topic']}")
+        disc_id_str = str(d.get('id') or d.get('thread_id', ''))
+        lines.append(f"\n{status_icon} [{disc_id_str[:20]}...] {d.get('topic', '?')}")
         lines.append(f"   参与者: {parts}  消息: {count}条  更新: {updated}")
     return "\n".join(lines)
 

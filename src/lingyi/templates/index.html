@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>灵依 — 私人助理</title>
+<style>
+:root {
+  --bg: #0f0f1a; --card: #1a1a2e; --card2: #222240; --border: #2a2a4a;
+  --text: #e0e0e0; --dim: #888; --accent: #e94560; --accent2: #ff6b81;
+  --green: #4ecca3; --yellow: #ffd93d; --blue: #6c9bff;
+  --radius: 12px; --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; -webkit-user-select:none; user-select:none; }
+
+/* Header */
+.header { background:var(--card); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); flex-shrink:0; z-index:10; }
+.header h1 { font-size:17px; color:var(--accent); font-weight:600; }
+.header-time { font-size:12px; color:var(--dim); }
+
+/* Page container */
+.pages { flex:1; overflow:hidden; position:relative; }
+.page { position:absolute; inset:0; overflow-y:auto; padding:12px 16px; display:none; -webkit-overflow-scrolling:touch; }
+.page.active { display:block; }
+
+/* Bottom nav */
+.nav { background:var(--card); display:flex; border-top:1px solid var(--border); flex-shrink:0; padding-bottom:var(--safe-bottom); z-index:10; }
+.nav button { flex:1; background:none; border:none; color:var(--dim); font-size:11px; padding:8px 0 6px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; transition:color .2s; }
+.nav button.active { color:var(--accent); }
+.nav button svg { width:22px; height:22px; }
+
+/* Cards */
+.card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:10px; }
+.card-title { font-size:13px; color:var(--dim); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+.card-title span { color:var(--accent); font-size:12px; cursor:pointer; }
+
+/* Schedule items */
+.sched-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); }
+.sched-item:last-child { border:none; }
+.sched-slot { background:var(--accent); color:#fff; font-size:11px; padding:2px 8px; border-radius:10px; white-space:nowrap; }
+.sched-slot.pm { background:var(--blue); }
+.sched-slot.eve { background:var(--yellow); color:#333; }
+.sched-desc { font-size:13px; flex:1; }
+.sched-type { font-size:11px; color:var(--dim); }
+
+/* Memo items */
+.memo-item { display:flex; align-items:flex-start; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); }
+.memo-item:last-child { border:none; }
+.memo-text { font-size:13px; flex:1; line-height:1.4; }
+.memo-time { font-size:11px; color:var(--dim); white-space:nowrap; }
+.memo-del { color:var(--dim); font-size:16px; cursor:pointer; padding:0 4px; }
+.memo-del:hover { color:var(--accent); }
+
+/* Ling family status */
+.ling-row { display:flex; align-items:center; gap:8px; padding:4px 0; }
+.ling-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.ling-dot.on { background:var(--green); box-shadow:0 0 6px var(--green); }
+.ling-dot.off { background:#555; }
+.ling-name { font-size:13px; width:60px; }
+.ling-detail { font-size:12px; color:var(--dim); }
+
+/* Project items */
+.proj-item { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border); }
+.proj-item:last-child { border:none; }
+.proj-pri { font-size:10px; padding:1px 6px; border-radius:8px; font-weight:600; }
+.proj-pri.P0 { background:#ff4444; color:#fff; }
+.proj-pri.P1 { background:#ff8800; color:#fff; }
+.proj-pri.P2 { background:var(--blue); color:#fff; }
+.proj-pri.P3 { background:#555; color:#ccc; }
+.proj-name { font-size:13px; flex:1; }
+.proj-alias { font-size:12px; color:var(--dim); }
+.proj-energy { font-size:11px; color:var(--green); }
+
+/* Quick buttons in chat */
+.quick-bar { display:flex; gap:6px; padding:6px 0; overflow-x:auto; flex-shrink:0; }
+.quick-bar::-webkit-scrollbar { display:none; }
+.qbtn { flex-shrink:0; background:var(--card2); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:5px 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.qbtn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Chat area */
+.chat-area { flex:1; overflow-y:auto; padding:8px 16px; display:flex; flex-direction:column; gap:8px; -webkit-overflow-scrolling:touch; }
+.msg { max-width:85%; padding:8px 12px; border-radius:12px; line-height:1.5; font-size:14px; word-break:break-word; }
+.msg.user { align-self:flex-end; background:#0f3460; color:#fff; border-bottom-right-radius:4px; }
+.msg.bot { align-self:flex-start; background:var(--card2); color:var(--text); border-bottom-left-radius:4px; white-space:pre-wrap; }
+.msg.bot audio { margin-top:6px; width:100%; height:28px; }
+.msg.system { align-self:center; background:none; color:var(--dim); font-size:12px; }
+.typing::after { content:'...'; animation:dots 1.2s steps(4,end) infinite; }
+@keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+
+/* Input bar */
+.input-bar { background:var(--card); padding:8px 12px; border-top:1px solid var(--border); display:flex; gap:6px; align-items:center; flex-shrink:0; padding-bottom:calc(8px + var(--safe-bottom)); }
+.input-bar input { flex:1; padding:9px 14px; border-radius:20px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14px; outline:none; }
+.input-bar input:focus { border-color:var(--accent); }
+.send-btn { background:var(--accent); color:#fff; border:none; width:38px; height:38px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.send-btn svg { width:18px; height:18px; fill:#fff; }
+
+/* Desktop: side-by-side */
+@media (min-width:768px) {
+  .pages { display:flex; }
+  .page { position:static; flex:1; }
+  .page.active { display:block; }
+  #pgHome { display:block !important; }
+  #pgChat { display:flex; flex-direction:column; border-left:1px solid var(--border); }
+  .nav { display:none; }
+  .header { display:none; }
+  .pages { padding-top:40px; }
+  .pages::before { content:'灵依 — 私人助理'; position:fixed; top:0; left:0; right:0; height:40px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; font-size:15px; color:var(--accent); font-weight:600; z-index:20; }
+}
+
+/* Add memo inline */
+.add-row { display:flex; gap:6px; margin-top:8px; }
+.add-row input { flex:1; padding:6px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; outline:none; }
+.add-row button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; }
+
+/* Empty state */
+.empty { text-align:center; padding:20px; color:var(--dim); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>灵依</h1>
+  <span class="header-time" id="headerTime"></span>
+</div>
+
+<div class="pages">
+  <!-- HOME / DASHBOARD -->
+  <div class="page active" id="pgHome"></div>
+
+  <!-- CHAT -->
+  <div class="page" id="pgChat">
+    <div class="quick-bar">
+      <button class="qbtn" onclick="sendQuick('备忘 ')">备忘</button>
+      <button class="qbtn" onclick="sendQuick('今天安排')">今天安排</button>
+      <button class="qbtn" onclick="sendQuick('本周安排')">本周安排</button>
+      <button class="qbtn" onclick="sendQuick('项目状态')">项目</button>
+      <button class="qbtn" onclick="sendQuick('情报')">情报</button>
+      <button class="qbtn" onclick="sendQuick('灵信')">灵信</button>
+      <button class="qbtn" onclick="sendQuick('智能提醒')">提醒</button>
+    </div>
+    <div class="chat-area" id="chatArea"></div>
+    <div class="input-bar">
+      <input type="text" id="chatInput" placeholder="跟灵依说..." autocomplete="off">
+      <button class="send-btn" onclick="sendText()"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- SCHEDULE -->
+  <div class="page" id="pgSched"></div>
+
+  <!-- MEMOS -->
+  <div class="page" id="pgMemo"></div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="nav">
+  <button class="active" onclick="switchPage('Home')" id="navHome"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>首页</button>
+  <button onclick="switchPage('Sched')" id="navSched"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>日程</button>
+  <button onclick="switchPage('Chat')" id="navChat"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>对话</button>
+  <button onclick="switchPage('Memo')" id="navMemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8v-2zm0-4h8v2H8v-2z"/></svg>备忘</button>
+</div>
+
+<script>
+let ws = null;
+let currentPage = 'Home';
+
+// ── Navigation ──────────────────────────────────────────
+function switchPage(name) {
+  currentPage = name;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  const pg = document.getElementById('pg' + name);
+  const nav = document.getElementById('nav' + name);
+  if (pg) pg.classList.add('active');
+  if (nav) nav.classList.add('active');
+
+  if (name === 'Home') loadDashboard();
+  if (name === 'Sched') loadSchedules();
+  if (name === 'Memo') loadMemos();
+}
+
+// ── Dashboard ───────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const r = await fetch('/api/dashboard');
+    const d = await r.json();
+    const pg = document.getElementById('pgHome');
+
+    let html = '';
+    // Date header
+    const dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+    const dt = new Date(d.date);
+    html += `<div style="text-align:center;padding:8px 0 12px"><div style="font-size:22px;font-weight:700">${dt.getMonth()+1}月${dt.getDate()}日 ${dayNames[dt.getDay()]}</div></div>`;
+
+    // Today schedule
+    html += '<div class="card"><div class="card-title">今日安排</div>';
+    if (d.today_schedules.length === 0) {
+      html += '<div class="empty">今天没有安排</div>';
+    } else {
+      d.today_schedules.forEach(s => {
+        const cls = s.slot === '上午' ? '' : s.slot === '下午' ? ' pm' : ' eve';
+        html += `<div class="sched-item"><span class="sched-slot${cls}">${s.slot}</span><span class="sched-desc">${s.description}</span></div>`;
+      });
+    }
+    html += '</div>';
+
+    // Ling family
+    html += '<div class="card"><div class="card-title">灵字辈</div>';
+    d.ling_family.forEach(l => {
+      html += `<div class="ling-row"><span class="ling-dot ${l.online?'on':'off'}"></span><span class="ling-name">${l.name}</span><span class="ling-detail">${l.detail}</span></div>`;
+    });
+    html += '</div>';
+
+    // Recent memos
+    html += '<div class="card"><div class="card-title">最近备忘 <span onclick="switchPage(\'Memo\')">全部 &gt;</span></div>';
+    if (d.recent_memos.length === 0) {
+      html += '<div class="empty">暂无备忘</div>';
+    } else {
+      d.recent_memos.forEach(m => {
+        const t = m.time ? m.time.slice(5,16).replace('T',' ') : '';
+        html += `<div class="memo-item"><span class="memo-text">${esc(m.content)}</span><span class="memo-time">${t}</span></div>`;
+      });
+    }
+    html += '</div>';
+
+    // Active projects
+    html += '<div class="card"><div class="card-title">活跃项目</div>';
+    d.active_projects.forEach(p => {
+      html += `<div class="proj-item"><span class="proj-pri ${p.priority}">${p.priority}</span><span class="proj-name">${esc(p.name)}</span><span class="proj-alias">${esc(p.alias)}</span>${p.energy?`<span class="proj-energy">${p.energy}%</span>`:''}</div>`;
+    });
+    html += '</div>';
+
+    pg.innerHTML = html;
+  } catch(e) {
+    document.getElementById('pgHome').innerHTML = '<div class="empty">加载失败，请检查灵依服务是否运行</div>';
+  }
+}
+
+// ── Schedules ───────────────────────────────────────────
+async function loadSchedules() {
+  try {
+    const r = await fetch('/api/schedules/week');
+    const d = await r.json();
+    const pg = document.getElementById('pgSched');
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const today = new Date().getDay();
+    const todayIdx = today === 0 ? 6 : today - 1;
+
+    let html = '';
+    days.forEach((day, i) => {
+      const info = d[day];
+      if (!info) return;
+      const isToday = i === todayIdx;
+      html += `<div class="card" style="${isToday?'border-color:var(--accent)':''}">`;
+      html += `<div class="card-title">${info.cn}${isToday?' ← 今天':''}</div>`;
+      if (info.items.length === 0) {
+        html += '<div class="empty">无安排</div>';
+      } else {
+        info.items.forEach(s => {
+          const cls = s.slot === '上午' ? '' : s.slot === '下午' ? ' pm' : ' eve';
+          html += `<div class="sched-item"><span class="sched-slot${cls}">${s.slot}</span><span class="sched-desc">${esc(s.desc)}</span></div>`;
+        });
+      }
+      html += '</div>';
+    });
+    pg.innerHTML = html;
+  } catch(e) {
+    document.getElementById('pgSched').innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+// ── Memos ───────────────────────────────────────────────
+async function loadMemos() {
+  try {
+    const r = await fetch('/api/memos');
+    const memos = await r.json();
+    const pg = document.getElementById('pgMemo');
+    let html = '<div class="card"><div class="card-title">备忘录</div>';
+    html += '<div class="add-row"><input type="text" id="newMemo" placeholder="记点什么..."><button onclick="addMemo()">记</button></div>';
+    if (memos.length === 0) {
+      html += '<div class="empty">暂无备忘</div>';
+    } else {
+      memos.forEach(m => {
+        const t = m.created_at ? m.created_at.slice(5,16).replace('T',' ') : '';
+        html += `<div class="memo-item"><span class="memo-text">${esc(m.content)}</span><span class="memo-time">${t}</span><span class="memo-del" onclick="delMemo(${m.id})">&times;</span></div>`;
+      });
+    }
+    html += '</div>';
+    pg.innerHTML = html;
+  } catch(e) {
+    document.getElementById('pgMemo').innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+async function addMemo() {
+  const inp = document.getElementById('newMemo');
+  const content = inp.value.trim();
+  if (!content) return;
+  await fetch('/api/memos', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content})});
+  inp.value = '';
+  loadMemos();
+}
+
+async function delMemo(id) {
+  await fetch('/api/memos/' + id, {method:'DELETE'});
+  loadMemos();
+}
+
+// ── Chat (WebSocket → 智桥) ────────────────────────────
+const BRIDGE_HOST = location.hostname;
+const BRIDGE_PORT = 8765;
+const BRIDGE_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
+let ws = null;
+let currentPage = 'Home';
+
+function connectWS() {
+  ws = new WebSocket(`${BRIDGE_PROTO}://${BRIDGE_HOST}:${BRIDGE_PORT}`);
+  ws.onopen = () => {
+    addChatMsg('system', '灵依已通过智桥上线');
+    ws.send(JSON.stringify({type:'list_backends'}));
+  };
+  ws.onclose = () => { addChatMsg('system', '连接断开，重连中...'); setTimeout(connectWS, 3000); };
+  ws.onerror = () => {};
+  ws.onmessage = onChatMsg;
+}
+
+function onChatMsg(e) {
+  const msg = JSON.parse(e.data);
+  if (msg.type === 'ping' || msg.type === 'pong') return;
+  if (msg.type === 'backends_list') {
+    console.log('可用AI后端:', msg.backends);
+    return;
+  }
+  if (msg.type === 'push') {
+    const div = addChatMsg('bot', msg.text);
+    div.classList.add('push');
+    if (Notification.permission !== 'granted') Notification.requestPermission();
+    if (Notification.permission === 'granted') new Notification('灵依推送', {body: msg.text.slice(0,80)});
+    return;
+  }
+  if (msg.type === 'reply') {
+    removeTyping();
+    const div = addChatMsg('bot', msg.text);
+    if (msg.audio) {
+      const audio = document.createElement('audio');
+      audio.controls = true; audio.autoplay = true;
+      audio.src = `data:audio/mp3;base64,${msg.audio}`;
+      div.appendChild(audio);
+      audio.play().catch(()=>{});
+    }
+  }
+  if (msg.type === 'error') {
+    removeTyping();
+    addChatMsg('system', '错误: ' + msg.message);
+  }
+}
+
+function addChatMsg(role, text) {
+  const area = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.textContent = text;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  removeTyping();
+  const div = document.createElement('div');
+  div.className = 'msg bot'; div.id = 'typing';
+  div.innerHTML = '<span class="typing">灵依在思考</span>';
+  document.getElementById('chatArea').appendChild(div);
+  document.getElementById('chatArea').scrollTop = 999999;
+}
+
+function removeTyping() { const el = document.getElementById('typing'); if (el) el.remove(); }
+
+function sendText() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+  addChatMsg('user', text);
+  ws.send(JSON.stringify({type:'chat', target:'lingyi', text}));
+  showTyping();
+  inp.value = '';
+}
+
+function sendQuick(text) {
+  if (!ws || ws.readyState !== 1) return;
+  addChatMsg('user', text);
+  ws.send(JSON.stringify({type:'chat', target:'lingyi', text}));
+  showTyping();
+  switchPage('Chat');
+}
+
+document.getElementById('chatInput').onkeydown = e => { if (e.key === 'Enter') sendText(); };
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── Clock ───────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const el = document.getElementById('headerTime');
+  if (el) el.textContent = `${h}:${m}`;
+}
+setInterval(updateClock, 30000); updateClock();
+
+// ── Init ────────────────────────────────────────────────
+loadDashboard();
+connectWS();
+</script>
+</body>
+</html>

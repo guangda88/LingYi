@@ -78,6 +78,13 @@
 - 话题式线程、9项目身份系统
 - msg-send/msg-list/msg-read/msg-reply/msg-search/msg-close 命令
 
+### v0.15 — Web UI
+- 手机浏览器打开，替代 ZeroTermux 终端操作
+- 语音对话为主，文字为辅（折叠屏场景）
+- 快速查看日程/备忘/计划，不用记命令
+- 自然对话操作所有功能（备忘/日程/计划/项目等）
+- 与 CLI 共享同一套 AI 对话引擎（Qwen LLM）
+
 ### v0.14+ — 按需
 - 见 DEVELOPMENT_PLAN.md
 

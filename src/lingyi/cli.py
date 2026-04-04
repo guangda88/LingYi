@@ -16,6 +16,8 @@ from .commands import voice as voice_cmds
 from .commands import mobile as mobile_cmds
 from .commands import briefing as briefing_cmds
 from .commands import lingmessage as lingmessage_cmds
+from .commands import web as web_cmds
+from .commands import voicecall as voicecall_cmds
 
 
 @click.group()
@@ -74,6 +76,8 @@ voice_cmds.register(cli)
 mobile_cmds.register(cli)
 briefing_cmds.register(cli)
 lingmessage_cmds.register(cli)
+web_cmds.register(cli)
+voicecall_cmds.register(cli)
 
 
 @cli.command("patrol")

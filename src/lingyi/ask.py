@@ -7,7 +7,7 @@ from urllib.error import URLError
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BASE_URL = "http://localhost:8080"
+_DEFAULT_BASE_URL = "http://localhost:8000"
 _TIMEOUT = 15
 
 
@@ -119,7 +119,7 @@ def format_ask_result(data: dict) -> str:
 
     answer = data.get("answer", "无结果")
     sources = data.get("sources", [])
-    lines = [f"📖 灵知回答：", f"{answer}"]
+    lines = ["📖 灵知回答：", f"{answer}"]
     if sources:
         lines.append("")
         lines.append(f"来源（{len(sources)}条）：")

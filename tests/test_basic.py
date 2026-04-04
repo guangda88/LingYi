@@ -781,7 +781,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.14.0"
+        assert __version__ == "0.15.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -790,7 +790,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.14.0" in r.output
+        assert "0.15.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -2238,3 +2238,78 @@ class TestLingMessageCLI:
         runner = CliRunner()
         r = runner.invoke(cli, ["msg-close", "disc_nonexistent"])
         assert "不存在" in r.output
+
+
+# ── v0.15 语音通话 ────────────────────────────────────
+
+class TestVoiceCall:
+    def test_check_dependencies(self):
+        from lingyi.voicecall import check_voice_call
+        deps = check_voice_call()
+        assert "vad" in deps
+        assert "stt" in deps
+        assert "tts" in deps
+        assert "record" in deps
+
+    def test_format_status_all_ok(self):
+        from lingyi.voicecall import format_voice_call_status
+        deps = {"vad": True, "stt": True, "tts": True, "record": True}
+        output = format_voice_call_status(deps)
+        assert "就绪" in output
+        assert "✅" in output
+
+    def test_format_status_missing(self):
+        from lingyi.voicecall import format_voice_call_status
+        deps = {"vad": True, "stt": False, "tts": True, "record": False}
+        output = format_voice_call_status(deps)
+        assert "缺失" in output
+        assert "❌" in output
+
+    def test_generate_reply_schedule(self, tmp_db):
+        from lingyi import voicecall as vc
+        orig = vc._chat_llm
+        vc._chat_llm = lambda conv: "今天没有安排"
+        try:
+            reply = vc._generate_reply("今天有什么安排", [])
+            assert isinstance(reply, str)
+            assert len(reply) > 0
+        finally:
+            vc._chat_llm = orig
+
+    def test_generate_reply_help(self, tmp_db):
+        from lingyi import voicecall as vc
+        orig = vc._chat_llm
+        vc._chat_llm = lambda conv: "我是灵依，你的AI助理"
+        try:
+            reply = vc._generate_reply("你能做什么", [])
+            assert "灵依" in reply
+        finally:
+            vc._chat_llm = orig
+
+    def test_generate_reply_goodbye(self, tmp_db):
+        from lingyi.voicecall import _generate_reply
+        reply = _generate_reply("再见", [])
+        assert "再见" in reply
+
+    def test_generate_reply_memo(self, tmp_db):
+        from lingyi.voicecall import _generate_reply
+        reply = _generate_reply("备忘买牛奶", [])
+        assert "已记录" in reply
+
+    def test_generate_reply_fallback(self, tmp_db):
+        from lingyi import voicecall as vc
+        orig = vc._chat_llm
+        vc._chat_llm = lambda conv: "你好呀"
+        try:
+            reply = vc._generate_reply("你好呀", [])
+            assert isinstance(reply, str)
+        finally:
+            vc._chat_llm = orig
+
+    def test_call_status_cli(self):
+        from click.testing import CliRunner
+        from lingyi.cli import cli
+        runner = CliRunner()
+        r = runner.invoke(cli, ["call-status"])
+        assert r.exit_code == 0
+        assert "语音通话" in r.output

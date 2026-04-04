@@ -10,7 +10,7 @@ def register(group: click.Group):
     @click.option("--speak", "speak_flag", is_flag=True, help="语音朗读回复")
     @click.option("--voice", "voice_mode", is_flag=True, help="语音对话模式（STT输入+TTS输出）")
     @click.option("--voice-sec", default=5, help="语音录音时长（秒，默认5）")
-    @click.option("--tts-voice", default="zh-CN-YunxiNeural", help="TTS语音角色")
+    @click.option("--tts-voice", default="zh-CN-XiaoxiaoNeural", help="TTS语音角色")
     def lingyi_chat(speak_flag: bool, voice_mode: bool, voice_sec: int, tts_voice: str):
         """交互式对话模式"""
         stt_info = None

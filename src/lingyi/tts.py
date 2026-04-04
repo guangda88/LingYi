@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-DEFAULT_VOICE = "zh-CN-YunxiNeural"
+DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
 
 
 def _get_audio_player() -> list[str] | None:
