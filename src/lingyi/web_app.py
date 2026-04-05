@@ -23,6 +23,57 @@ logger = logging.getLogger(__name__)
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 _SESSIONS: dict[str, datetime] = {}
+_PERSISTENT_TOKEN_PATH = Path.home() / ".lingyi" / ".web_tokens"
+
+
+def _load_persistent_tokens() -> dict[str, str]:
+    try:
+        if _PERSISTENT_TOKEN_PATH.exists():
+            data = json.loads(_PERSISTENT_TOKEN_PATH.read_text("utf-8"))
+            now = datetime.now().isoformat()
+            return {k: v for k, v in data.items() if v > now}
+    except Exception:
+        pass
+    return {}
+
+
+def _save_persistent_tokens(tokens: dict[str, str]):
+    try:
+        _PERSISTENT_TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _PERSISTENT_TOKEN_PATH.write_text(json.dumps(tokens, ensure_ascii=False, indent=2), "utf-8")
+    except Exception as exc:
+        logger.error(f"Failed to save persistent tokens: {exc}")
+
+
+def _add_persistent_token(token: str, expires: datetime):
+    tokens = _load_persistent_tokens()
+    tokens[token] = expires.isoformat()
+    _save_persistent_tokens(tokens)
+
+
+def _remove_persistent_token(token: str):
+    tokens = _load_persistent_tokens()
+    tokens.pop(token, None)
+    _save_persistent_tokens(tokens)
+
+
+def _check_auth(token: str) -> bool:
+    if not token:
+        return False
+    exp = _SESSIONS.get(token)
+    if exp:
+        if datetime.now() > exp:
+            del _SESSIONS[token]
+            return False
+        return True
+    persistent = _load_persistent_tokens()
+    exp_str = persistent.get(token)
+    if exp_str:
+        if datetime.now() < datetime.fromisoformat(exp_str):
+            return True
+        else:
+            _remove_persistent_token(token)
+    return False
 
 
 def _get_web_password() -> str:
@@ -57,18 +108,6 @@ def _generate_and_save_password() -> str:
 
 def _hash_password(pwd: str) -> str:
     return hashlib.sha256(pwd.encode()).hexdigest()
-
-
-def _check_auth(token: str) -> bool:
-    if not token:
-        return False
-    exp = _SESSIONS.get(token)
-    if not exp:
-        return False
-    if datetime.now() > exp:
-        del _SESSIONS[token]
-        return False
-    return True
 
 
 def _serialize(obj):
@@ -106,7 +145,7 @@ def create_app(password: str | None = None):
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
         path = request.url.path
-        if path in ("/", "/login") or path == "/api/login":
+        if path in ("/", "/login") or path.startswith("/api/login"):
             return await call_next(request)
         if not _auth_enabled:
             return await call_next(request)
@@ -132,13 +171,31 @@ def create_app(password: str | None = None):
     async def api_login(request: Request):
         body = await request.json()
         pwd = body.get("password", "")
+        remember = body.get("remember", False)
         if _hash_password(pwd) == _web_pwd_hash:
             token = secrets.token_hex(32)
-            _SESSIONS[token] = datetime.now() + timedelta(hours=24)
-            resp = JSONResponse({"ok": True})
-            resp.set_cookie("lingyi_token", token, max_age=86400, httponly=True, samesite="lax")
+            if remember:
+                expires = datetime.now() + timedelta(days=30)
+                _SESSIONS[token] = expires
+                _add_persistent_token(token, expires)
+                resp = JSONResponse({"ok": True})
+                resp.set_cookie("lingyi_token", token, max_age=2592000, httponly=True, samesite="lax")
+            else:
+                _SESSIONS[token] = datetime.now() + timedelta(hours=24)
+                resp = JSONResponse({"ok": True})
+                resp.set_cookie("lingyi_token", token, max_age=86400, httponly=True, samesite="lax")
             return resp
         return JSONResponse({"error": "密码错误"}, status_code=403)
+
+    @app.post("/api/logout")
+    async def api_logout(request: Request):
+        token = request.cookies.get("lingyi_token", "")
+        if token:
+            _SESSIONS.pop(token, None)
+            _remove_persistent_token(token)
+        resp = JSONResponse({"ok": True})
+        resp.set_cookie("lingyi_token", "", max_age=0)
+        return resp
 
     # ── 静态页面 ──────────────────────────────────────────
     @app.get("/", response_class=HTMLResponse)
