@@ -281,9 +281,7 @@ def _build_system_prompt() -> str:
 
     return "\n\n".join(parts)
 
-_DASHSCOPE_API_KEY = os.environ.get(
-    "DASHSCOPE_API_KEY", "sk-87b60796471c4596bcd7278d4ac12dfe"
-)
+_DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 
 
 def _chat_llm(conversation: list[dict]) -> str:

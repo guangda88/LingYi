@@ -8,17 +8,67 @@
 
 import asyncio
 import base64
+import hashlib
 import json
 import logging
+import os
+import secrets
 import tempfile
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
-_DASHSCOPE_API_KEY = "sk-87b60796471c4596bcd7278d4ac12dfe"
+_DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+_SESSIONS: dict[str, datetime] = {}
+
+
+def _get_web_password() -> str:
+    try:
+        import json as _json
+        presets_path = Path.home() / ".lingyi" / "presets.json"
+        if presets_path.exists():
+            data = _json.loads(presets_path.read_text("utf-8"))
+            if data.get("web_password"):
+                return str(data["web_password"])
+    except Exception:
+        pass
+    return ""
+
+
+def _generate_and_save_password() -> str:
+    import string
+    import json as _json
+    chars = string.ascii_lowercase + string.digits
+    pwd = "".join(secrets.choice(chars) for _ in range(8))
+    try:
+        presets_path = Path.home() / ".lingyi" / "presets.json"
+        data = {}
+        if presets_path.exists():
+            data = _json.loads(presets_path.read_text("utf-8"))
+        data["web_password"] = pwd
+        presets_path.write_text(_json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
+    except Exception as exc:
+        logger.error(f"Failed to save web_password: {exc}")
+    return pwd
+
+
+def _hash_password(pwd: str) -> str:
+    return hashlib.sha256(pwd.encode()).hexdigest()
+
+
+def _check_auth(token: str) -> bool:
+    if not token:
+        return False
+    exp = _SESSIONS.get(token)
+    if not exp:
+        return False
+    if datetime.now() > exp:
+        del _SESSIONS[token]
+        return False
+    return True
 
 
 def _serialize(obj):
@@ -29,12 +79,41 @@ def _serialize(obj):
     return obj
 
 
-def create_app():
+def create_app(password: str | None = None):
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import HTMLResponse, JSONResponse
+    from starlette.requests import Request
 
     app = FastAPI(title="灵依 — 私人助理")
+
+    _web_pwd_hash = ""
+    if password:
+        _web_pwd_hash = _hash_password(password)
+    else:
+        stored = _get_web_password()
+        if stored:
+            _web_pwd_hash = _hash_password(stored)
+        else:
+            new_pwd = _generate_and_save_password()
+            _web_pwd_hash = _hash_password(new_pwd)
+            import click
+            click.echo(click.style(f"\n🔐 Web UI 密码已生成: {new_pwd}", fg="green", bold=True))
+            click.echo(click.style("   已保存到 ~/.lingyi/presets.json", fg="dim"))
+            click.echo(click.style("   用 lingyi pref set web_password 新密码 可修改\n", fg="dim"))
+    _auth_enabled = bool(_web_pwd_hash)
+
+    @app.middleware("http")
+    async def auth_middleware(request: Request, call_next):
+        path = request.url.path
+        if path in ("/", "/login") or path == "/api/login":
+            return await call_next(request)
+        if not _auth_enabled:
+            return await call_next(request)
+        token = request.cookies.get("lingyi_token", "")
+        if not _check_auth(token):
+            return JSONResponse({"error": "未授权"}, status_code=401)
+        return await call_next(request)
 
     app.add_middleware(
         CORSMiddleware,
@@ -42,6 +121,24 @@ def create_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/login", response_class=HTMLResponse)
+    async def login_page():
+        if not _auth_enabled:
+            return HTMLResponse('<script>location.href="/"</script>')
+        return HTMLResponse((_TEMPLATE_DIR / "login.html").read_text("utf-8"))
+
+    @app.post("/api/login")
+    async def api_login(request: Request):
+        body = await request.json()
+        pwd = body.get("password", "")
+        if _hash_password(pwd) == _web_pwd_hash:
+            token = secrets.token_hex(32)
+            _SESSIONS[token] = datetime.now() + timedelta(hours=24)
+            resp = JSONResponse({"ok": True})
+            resp.set_cookie("lingyi_token", token, max_age=86400, httponly=True, samesite="lax")
+            return resp
+        return JSONResponse({"error": "密码错误"}, status_code=403)
 
     # ── 静态页面 ──────────────────────────────────────────
     @app.get("/", response_class=HTMLResponse)
@@ -233,7 +330,6 @@ def create_app():
             "uptime_port": 8900,
             "bridge_connected": bool(_bridge_ws),
             "direct_ws_clients": len(_active_ws),
-            "conversation_length": len(_conversation),
             "tools_count": 29,
             "cognitive_state": {
                 "last_push_date": _last_push_date,
@@ -317,19 +413,22 @@ def create_app():
             logger.error(f"Failed to save chat message: {exc}")
 
     _ensure_chat_table()
-    _conversation: list[dict] = _load_recent_chat()
+
+    _MAX_CONVERSATION = 60
 
     @app.websocket("/ws/chat")
     async def ws_chat(websocket: WebSocket):
+        raw_token = websocket.query_params.get("token", "")
+        if _auth_enabled and not _check_auth(raw_token):
+            await websocket.close(code=4001, reason="unauthorized")
+            return
         await websocket.accept()
 
+        local_conv: list[dict] = _load_recent_chat(20)
+
         # Send recent history to client
-        if _conversation:
-            history_text = []
-            for m in _conversation[-20:]:
-                prefix = "灵通老师" if m["role"] == "user" else "灵依"
-                history_text.append(f"{prefix}: {m['content']}")
-            await websocket.send_json({"type": "history", "messages": _conversation[-20:]})
+        if local_conv:
+            await websocket.send_json({"type": "history", "messages": local_conv[-20:]})
 
         async def _keepalive():
             try:
@@ -358,10 +457,12 @@ def create_app():
                     user_text = msg.get("text", "").strip()
                     if not user_text:
                         continue
-                    _conversation.append({"role": "user", "content": user_text})
+                    local_conv.append({"role": "user", "content": user_text})
                     _save_chat_message("user", user_text)
-                    reply = await _smart_reply(user_text)
-                    _conversation.append({"role": "assistant", "content": reply})
+                    reply = await _smart_reply(user_text, local_conv)
+                    local_conv.append({"role": "assistant", "content": reply})
+                    if len(local_conv) > _MAX_CONVERSATION:
+                        local_conv[:] = local_conv[-_MAX_CONVERSATION:]
                     _save_chat_message("assistant", reply)
                     audio_b64 = await _do_tts(reply)
                     await websocket.send_json({"type": "reply", "text": reply, "audio": audio_b64})
@@ -379,10 +480,12 @@ def create_app():
                         await websocket.send_json({"type": "reply", "text": "未识别到语音，请重试", "audio": None})
                         continue
                     await websocket.send_json({"type": "recognized", "text": recognized})
-                    _conversation.append({"role": "user", "content": recognized})
+                    local_conv.append({"role": "user", "content": recognized})
                     _save_chat_message("user", recognized)
-                    reply = await _smart_reply(recognized)
-                    _conversation.append({"role": "assistant", "content": reply})
+                    reply = await _smart_reply(recognized, local_conv)
+                    local_conv.append({"role": "assistant", "content": reply})
+                    if len(local_conv) > _MAX_CONVERSATION:
+                        local_conv[:] = local_conv[-_MAX_CONVERSATION:]
                     _save_chat_message("assistant", reply)
                     audio_b64 = await _do_tts(reply)
                     await websocket.send_json({"type": "reply", "text": reply, "audio": audio_b64})
@@ -395,21 +498,19 @@ def create_app():
             ka_task.cancel()
             _active_ws.discard(websocket)
 
-    async def _smart_reply(text: str) -> str:
+    async def _smart_reply(text: str, conv: list[dict] | None = None) -> str:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _smart_reply_sync, text)
+        return await loop.run_in_executor(None, lambda: _chat_llm_with_context(text, conv))
 
-    def _smart_reply_sync(text: str) -> str:
-        return _chat_llm_with_context(text)
-
-    def _chat_llm_with_context(text: str) -> str:
+    def _chat_llm_with_context(text: str, conv: list[dict] | None = None) -> str:
         import dashscope
         from dashscope import Generation
         from .tools import get_tools, execute_tool
 
         dashscope.api_key = _DASHSCOPE_API_KEY
         system_prompt = _build_system_prompt()
-        messages = [{"role": "system", "content": system_prompt}] + _conversation[-20:]
+        context = conv if conv is not None else []
+        messages = [{"role": "system", "content": system_prompt}] + context[-20:]
         tools_schema = get_tools()
 
         for _ in range(5):
@@ -868,13 +969,17 @@ def create_app():
             from .bridge_client import bridge_push
             await bridge_push(_bridge_ws[0], text, category)
 
+    _bridge_conv: list[dict] = _load_recent_chat(20)
+
     async def _bridge_on_chat(text: str, request_id: str, from_client: str, audio: str | None) -> tuple[str, str | None]:
         """处理来自智桥的用户消息。"""
         loop = asyncio.get_event_loop()
-        _conversation.append({"role": "user", "content": text})
+        _bridge_conv.append({"role": "user", "content": text})
         _save_chat_message("user", text)
-        reply = await loop.run_in_executor(None, _chat_llm_with_context, text)
-        _conversation.append({"role": "assistant", "content": reply})
+        reply = await loop.run_in_executor(None, lambda t: _chat_llm_with_context(t, _bridge_conv), text)
+        _bridge_conv.append({"role": "assistant", "content": reply})
+        if len(_bridge_conv) > _MAX_CONVERSATION:
+            _bridge_conv[:] = _bridge_conv[-_MAX_CONVERSATION:]
         _save_chat_message("assistant", reply)
         audio_b64 = await _do_tts(reply)
         return reply, audio_b64
@@ -895,9 +1000,9 @@ def create_app():
     return app
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8900, ssl: bool = True):
+def run_server(host: str = "0.0.0.0", port: int = 8900, ssl: bool = True, password: str | None = None):
     import uvicorn
-    app = create_app()
+    app = create_app(password=password)
     ssl_kwargs = {}
     if ssl:
         cert_dir = Path.home() / ".lingyi"

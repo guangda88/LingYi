@@ -11,9 +11,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
-_DASHSCOPE_API_KEY = os.environ.get(
-    "DASHSCOPE_API_KEY", "sk-87b60796471c4596bcd7278d4ac12dfe"
-)
+_DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 
 _MAX_HISTORY = 40
 
