@@ -357,7 +357,17 @@ def create_app(password: str | None = None):
         path = request.url.path
         # 公开端点列表（明确列出）
         public_paths = {"/", "/login"}
-        public_prefixes = {"/api/login", "/static", "/favicon", "/api/lingmessage/notify", "/api/lingmessage", "/api/discuss", "/ws/"}
+        public_prefixes = {
+            "/api/login", "/static", "/favicon",
+            "/api/lingmessage/notify", "/api/lingmessage",
+            "/api/discuss", "/api/dashboard",
+            "/api/memos", "/api/schedules",
+            "/api/projects", "/api/plans",
+            "/api/preferences", "/api/briefing",
+            "/api/status", "/api/models",
+            "/api/usage", "/api/council",
+            "/ws/"
+        }
 
         # 检查是否是公开路径
         if path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
