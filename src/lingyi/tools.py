@@ -627,3 +627,133 @@ def _code_stats(project: str = "") -> str:
 _register("code_stats", "统计灵字辈项目的代码量", {
     "project": {"type": "string", "description": "项目名称（可选，留空统计全部）"},
 }, executor=_code_stats)
+
+
+# ── UI-TARS 视觉-操作闭环 ─────────────────────────────────
+
+def _ui_capture_screenshot(url: str, width: int = 1920, height: int = 1080) -> str:
+    """捕获网页截图"""
+    try:
+        from .ui_tars import capture_screenshot
+        result = capture_screenshot(url, width=width, height=height)
+        return f"截图成功: {result['image_path']} ({result['width']}x{result['height']})"
+    except Exception as e:
+        return f"截图失败: {e}"
+
+
+def _ui_ocr(image_path: str, x: int | None = None, y: int | None = None,
+            width: int | None = None, height: int | None = None) -> str:
+    """识别图像中的文字（OCR）"""
+    try:
+        from .ui_tars import ocr_image
+        region = None
+        if x is not None and y is not None and width is not None and height is not None:
+            region = {"x": x, "y": y, "width": width, "height": height}
+
+        result = ocr_image(image_path, region=region)
+        lines = [
+            f"识别成功（置信度: {result['confidence']:.2f}）",
+            f"文字内容:\n{result['text']}",
+        ]
+        if result.get('lines'):
+            lines.append(f"\n逐行识别 ({len(result['lines'])} 行):")
+            for i, line in enumerate(result['lines'][:10], 1):
+                lines.append(f"  {i}. {line.get('text', '')}")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"OCR识别失败: {e}"
+
+
+def _ui_find_elements(image_path: str, element_type: str = "button", text: str | None = None) -> str:
+    """在图像中查找UI元素"""
+    try:
+        from .ui_tars import find_elements
+        result = find_elements(image_path, element_type=element_type, text=text)
+
+        if result['count'] == 0:
+            return f"未找到类型为 {element_type} 的元素"
+
+        lines = [f"找到 {result['count']} 个 {element_type} 元素:"]
+        for i, elem in enumerate(result['elements'][:10], 1):
+            bbox = elem.get('bbox', {})
+            lines.append(f"  {i}. 位置: ({bbox.get('x', 0)}, {bbox.get('y', 0)}) "
+                        f"大小: {bbox.get('width', 0)}x{bbox.get('height', 0)}")
+            if elem.get('text'):
+                lines.append(f"      文字: {elem['text']}")
+            if elem.get('confidence'):
+                lines.append(f"      置信度: {elem['confidence']:.2f}")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"元素查找失败: {e}"
+
+
+def _ui_analyze(image_path: str) -> str:
+    """分析UI界面状态"""
+    try:
+        from .ui_tars import analyze_ui_state
+        result = analyze_ui_state(image_path)
+
+        lines = [
+            f"UI类型: {result['ui_type']}",
+            f"摘要: {result['summary']}",
+        ]
+        if result.get('text_content'):
+            lines.append(f"\n主要文字内容:\n{result['text_content'][:500]}")
+        if result.get('interactive_elements'):
+            lines.append(f"\n可交互元素 ({len(result['interactive_elements'])} 个):")
+            for elem in result['interactive_elements'][:5]:
+                lines.append(f"  - {elem.get('type', 'unknown')}: {elem.get('text', elem.get('selector', ''))}")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"UI分析失败: {e}"
+
+
+def _ui_status() -> str:
+    """获取UI-TARS服务状态"""
+    try:
+        from .ui_tars import get_status
+        status = get_status()
+
+        lines = ["UI-TARS服务状态:"]
+        lines.append(f"  启用: {'是' if status['enabled'] else '否'}")
+        lines.append(f"  可用: {'是' if status['available'] else '否'}")
+        lines.append(f"  API地址: {status['api_url']}")
+        if status.get('version'):
+            lines.append(f"  版本: {status['version']}")
+
+        if status['enabled'] and not status['available']:
+            lines.append("\n⚠️ UI功能已启用但服务不可用，请检查UI-TARS服务状态")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"状态查询失败: {e}"
+
+
+_register("ui_capture", "捕获网页截图", {
+    "url": {"type": "string", "description": "目标网页URL"},
+    "width": {"type": "integer", "description": "截图宽度（默认1920）"},
+    "height": {"type": "integer", "description": "截图高度（默认1080）"},
+}, ["url"], _ui_capture_screenshot)
+
+_register("ui_ocr", "识别图像中的文字（OCR）", {
+    "image_path": {"type": "string", "description": "图像文件路径"},
+    "x": {"type": "integer", "description": "识别区域左上角X坐标（可选）"},
+    "y": {"type": "integer", "description": "识别区域左上角Y坐标（可选）"},
+    "width": {"type": "integer", "description": "识别区域宽度（可选）"},
+    "height": {"type": "integer", "description": "识别区域高度（可选）"},
+}, ["image_path"], _ui_ocr)
+
+_register("ui_find", "在图像中查找UI元素", {
+    "image_path": {"type": "string", "description": "图像文件路径"},
+    "element_type": {"type": "string", "description": "元素类型（button/text/image/link）"},
+    "text": {"type": "string", "description": "元素文本内容（可选）"},
+}, ["image_path", "element_type"], _ui_find_elements)
+
+_register("ui_analyze", "分析UI界面状态", {
+    "image_path": {"type": "string", "description": "图像文件路径"},
+}, ["image_path"], _ui_analyze)
+
+_register("ui_status", "获取UI-TARS服务状态", {}, executor=_ui_status)
