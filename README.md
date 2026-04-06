@@ -7,7 +7,8 @@
 
 ## 版本
 
-- **v0.14 灵信** — 跨项目讨论框架、话题式线程、9项目身份系统
+- **v0.15 安全加固** — 审计P0-P2全修复：API密钥日志清除、CORS白名单、GLM_BASE_URL bug、路径白名单、XSS防护、登录防暴破、WebSocket Cookie认证
+- v0.14 灵信 — 跨项目讨论框架、话题式线程、9项目身份系统
 - v0.13 情报汇总 — 每日情报聚合、多源摘要、天气/日程/任务/项目一站概览
 - v0.12 移动端 — 移动设备支持、远程访问
 - v0.11 双向语音 — Whisper语音识别、语音命令
@@ -59,14 +60,22 @@ LingYi/
 │   ├── code.py              # 灵克编程助手
 │   ├── digest.py            # 内容摘要
 │   ├── briefing.py          # 情报聚合
-│   ├── lingmessage.py       # 灵信讨论框架
-│   └── mobile.py            # 移动端支持
-├── tests/                   # 测试（243 tests）
+│   ├── llm_utils.py        # LLM调用（模型降级+配额感知）
+│   ├── tools.py              # 工具注册表（28工具）
+│   ├── agent.py              # CLI智能代理
+│   ├── voicecall.py          # 语音通话（VAD+实时对话）
+│   ├── web_app.py            # Web UI（FastAPI+WebSocket）
+│   ├── council.py            # 议事厅守护进程
+│   ├── dashboard.py          # 情报可视化仪表板
+│   ├── trends.py             # 趋势分析
+│   ├── bridge_client.py      # 智桥WebSocket客户端
+├── tests/                   # 测试（252 tests）
 ├── docs/                    # 文档
 │   ├── MISSION.md           #   宪章
 │   ├── DEVELOPMENT_PRINCIPLES.md  # 开发原则
 │   ├── DEVELOPMENT_PLAN.md  #   开发规划
-│   ├── AUDIT_REPORT_v0.13.md #  v0.13 审计报告
+│   ├── AUDIT_REPORT_v0.15.md #   v0.15 审计报告
+│   ├── AUDIT_REPORT_v0.15_SELF_AUDIT.md #  自审计
 │   ├── LINGMESSAGE_RFC.md   #  灵信 RFC 设计文档
 │   └── LINGMESSAGE_DISCUSSIONS.md # 灵信首批讨论汇总
 ├── presets.example.json     # 预设模板（公开）
@@ -129,8 +138,9 @@ lingyi report
 | 原则 | 选择 |
 |------|------|
 | 语言 | Python 3.12 |
-| 框架 | Click (CLI) |
+| 框架 | Click (CLI) + FastAPI (Web) |
 | 数据库 | SQLite |
+| LLM | GLM (智谱) + 自动降级 |
 | TTS | edge-tts (Microsoft) |
 | STT | Whisper (OpenAI) |
 | 存储 | 本地文件 |
@@ -139,5 +149,6 @@ lingyi report
 
 - [宪章 MISSION.md](docs/MISSION.md) — 使命、价值观、边界
 - [开发原则 DEVELOPMENT_PRINCIPLES.md](docs/DEVELOPMENT_PRINCIPLES.md) — 十条开发原则
-- [开发规划 DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) — 版本路线图 v0.1–v0.14+
-- [审计报告 AUDIT_REPORT_v0.13.md](docs/AUDIT_REPORT_v0.13.md) — v0.13 系统审计
+- [开发规划 DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) — 版本路线图 v0.1–v0.15
+- [审计报告 AUDIT_REPORT_v0.15.md](docs/AUDIT_REPORT_v0.15.md) — v0.15 安全审计
+- [自审计 AUDIT_REPORT_v0.15_SELF_AUDIT.md](docs/AUDIT_REPORT_v0.15_SELF_AUDIT.md) — 审计质量校验
