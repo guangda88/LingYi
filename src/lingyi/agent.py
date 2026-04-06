@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable
@@ -357,19 +358,21 @@ def _read_lingmessage(discussion_id: str) -> str:
 
 def _search_web(query: str) -> str:
     try:
-        from urllib.parse import quote_plus
-        url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+        url = f"https://hn.algolia.com/api/v1/search?query={urllib.parse.quote_plus(query)}&tags=story&hitsPerPage=8"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (LingYi)"})
         with urllib.request.urlopen(req, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-        results = re.findall(r'class="result__a"[^>]*>(.*?)</a>', html)
-        snippets = re.findall(r'class="result__snippet"[^>]*>(.*?)</[at]', html)
-        clean = lambda t: re.sub(r'<[^>]+>', '', t).strip()
+            data = json.loads(resp.read().decode("utf-8"))
         lines = []
-        for i in range(min(5, len(results))):
-            title = clean(results[i]) if i < len(results) else ""
-            snippet = clean(snippets[i]) if i < len(snippets) else ""
-            lines.append(f"{i+1}. {title}\n   {snippet}")
+        for i, hit in enumerate(data.get("hits", [])[:8]):
+            title = (hit.get("title") or "").strip()
+            link = hit.get("url", "")
+            points = hit.get("points") or 0
+            if not title:
+                continue
+            line = f"{i+1}. {title} ({points}pts)"
+            if link:
+                line += f"\n   {link}"
+            lines.append(line)
         return "\n".join(lines) if lines else "未找到相关结果。"
     except Exception as e:
         return f"搜索失败: {e}"
@@ -516,7 +519,7 @@ def _agent_loop(text: str, conversation: list[dict]) -> str:
     max_rounds = 5
     for _ in range(max_rounds):
         try:
-            resp = call_llm_with_fallback(client, messages, tools=_TOOLS)
+            resp, _model_used = call_llm_with_fallback(client, messages, tools=_TOOLS)
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             return friendly_error(e)

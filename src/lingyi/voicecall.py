@@ -295,7 +295,7 @@ def _chat_llm(conversation: list[dict]) -> str:
     tools = get_tools()
 
     try:
-        resp = call_llm_with_fallback(client, messages, tools=tools)
+        resp, _model_used = call_llm_with_fallback(client, messages, tools=tools)
     except Exception as e:
         logger.warning(f"GLM call failed: {e}")
         return friendly_error(e)

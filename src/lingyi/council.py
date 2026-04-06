@@ -320,7 +320,7 @@ def _judge_discussion_with_llm(disc: dict) -> Optional[dict]:
 
     try:
         client = create_client()
-        resp = call_llm_with_fallback(
+        resp, _model_used = call_llm_with_fallback(
             client,
             messages=[
                 {"role": "system", "content": system_prompt},

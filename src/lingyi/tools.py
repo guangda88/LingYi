@@ -7,6 +7,7 @@ Qwen 格式的工具列表，调用 execute_tool() 执行模型选择的工具�
 import json as _json
 import logging
 import re as _re
+import urllib.parse as _urllib_parse
 import urllib.request as _urllib_request
 from typing import Any, Callable
 
@@ -307,22 +308,29 @@ def _ai_news() -> str:
         stale_info = f"（本地最新: {stale[0].stem.replace('AI_NEWS_','')}，非今日）"
 
     try:
-        from urllib.parse import quote_plus
-        queries = ["AI artificial intelligence latest news 2025", "AI 人工智能 最新新闻 今日"]
+        queries = ["AI LLM GPT artificial intelligence", "AI agent open source model", "AI 人工智能 大模型"]
         all_items = []
         for q in queries:
-            url = f"https://html.duckduckgo.com/html/?q={quote_plus(q)}"
-            req = _urllib_request.Request(url, headers={"User-Agent": "Mozilla/5.0 (LingYi)"})
-            with _urllib_request.urlopen(req, timeout=10) as resp:
-                html = resp.read().decode("utf-8", errors="replace")
-            results = _re.findall(r'class="result__a"[^>]*>(.*?)</a>', html)
-            snippets = _re.findall(r'class="result__snippet"[^>]*>(.*?)</[at]', html)
-            clean = lambda t: _re.sub(r'<[^>]+>', '', t).strip()
-            for i in range(min(5, len(results))):
-                title = clean(results[i]) if i < len(results) else ""
-                snippet = clean(snippets[i]) if i < len(snippets) else ""
-                if title:
-                    all_items.append(f"**{title}**\n{snippet}")
+            try:
+                url = f"https://hn.algolia.com/api/v1/search_by_date?query={_urllib_parse.quote_plus(q)}&tags=story&hitsPerPage=5"
+                req = _urllib_request.Request(url, headers={"User-Agent": "Mozilla/5.0 (LingYi)"})
+                with _urllib_request.urlopen(req, timeout=10) as resp:
+                    hn_data = _json.loads(resp.read().decode("utf-8"))
+                for hit in hn_data.get("hits", []):
+                    title = (hit.get("title") or "").strip()
+                    if not title:
+                        continue
+                    link = hit.get("url", "")
+                    points = hit.get("points") or 0
+                    date_str = (hit.get("created_at") or "")[:10]
+                    line = f"**{title}**"
+                    if link:
+                        line += f"\n[link]({link})"
+                    line += f"\n{date_str} · {points} points"
+                    if title not in [it.split("**")[1] if "**" in it else "" for it in all_items]:
+                        all_items.append(line)
+            except Exception:
+                continue
         if all_items:
             seen = set()
             unique = []
@@ -418,19 +426,21 @@ _register("check_pypi", "查询 PyPI 包的版本和下载量", {
 
 def _search_web(query: str) -> str:
     try:
-        from urllib.parse import quote_plus
-        url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+        url = f"https://hn.algolia.com/api/v1/search?query={_urllib_parse.quote_plus(query)}&tags=story&hitsPerPage=8"
         req = _urllib_request.Request(url, headers={"User-Agent": "Mozilla/5.0 (LingYi)"})
         with _urllib_request.urlopen(req, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-        results = _re.findall(r'class="result__a"[^>]*>(.*?)</a>', html)
-        snippets = _re.findall(r'class="result__snippet"[^>]*>(.*?)</[at]', html)
-        clean = lambda t: _re.sub(r'<[^>]+>', '', t).strip()
+            data = _json.loads(resp.read().decode("utf-8"))
         lines = []
-        for i in range(min(5, len(results))):
-            title = clean(results[i]) if i < len(results) else ""
-            snippet = clean(snippets[i]) if i < len(snippets) else ""
-            lines.append(f"{i+1}. {title}\n   {snippet}")
+        for i, hit in enumerate(data.get("hits", [])[:8]):
+            title = (hit.get("title") or "").strip()
+            link = hit.get("url", "")
+            points = hit.get("points") or 0
+            if not title:
+                continue
+            line = f"{i+1}. {title} ({points}pts)"
+            if link:
+                line += f"\n   {link}"
+            lines.append(line)
         return "\n".join(lines) if lines else "未找到相关结果。"
     except Exception as e:
         return f"搜索失败: {e}"

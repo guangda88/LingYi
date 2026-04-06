@@ -1,4 +1,4 @@
-"""共享 LLM 调用模块 — 模型自动降级 + 配额窗口感知 + 清晰错误提示"""
+"""共享 LLM 调用模块 — 模型自动降级 + 配额窗口感知 + 清晰错误提示 + 用量统计"""
 
 import logging
 import os
@@ -13,47 +13,38 @@ _PRIMARY_MODEL = os.environ.get("GLM_MODEL", "glm-5.1")
 _FALLBACK_MODELS = ["glm-5", "glm-4.5-air", "glm-4-flash"]
 _GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 
-# 配额重置锚点: 从这个时间起每5小时重置一次
-# 用户反馈: 重置时间 15:57 → 以此反推周期
 _RESET_ANCHOR_HOUR = 15
 _RESET_ANCHOR_MIN = 57
-_RESET_INTERVAL = 5 * 3600  # 5小时
+_RESET_INTERVAL = 5 * 3600
 
-# 配额耗尽的模型缓存: {model_name: quota_reset_timestamp}
 _quota_exhausted: dict[str, float] = {}
 
-# 最近一次探测 premium 模型可用性的时间
 _last_probe_time: float = 0.0
-_probe_interval = 300  # 5分钟探测一次
+_probe_interval = 300
+
+import threading
+
+_usage_tracker: dict[str, dict] = {}
+_usage_lock = threading.Lock()
 
 
-def _load_glm_key() -> str:
-    key = os.environ.get(
-        "GLM_CODING_PLAN_KEY",
-        os.environ.get("GLM_API_KEY", ""),
-    )
-    if key:
-        return key
-    for kf in [
-        Path.home() / ".glm_api_key",
-        Path("/home/ai/zhineng-knowledge-system/.env"),
-    ]:
-        if kf.exists() and kf.suffix == ".env":
-            for line in kf.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line.startswith("GLM_CODING_PLAN_KEY="):
-                    return line.split("=", 1)[1].strip()
-                if line.startswith("GLM_API_KEY=") and not key:
-                    key = line.split("=", 1)[1].strip()
-            if key:
-                return key
-        elif kf.exists():
-            return kf.read_text(encoding="utf-8").strip()
-    return key
-
-
-GLM_API_KEY = _load_glm_key()
+GLM_API_KEY = ""
 GLM_BASE_URL = _GLM_BASE_URL
+
+
+def _init_keys() -> None:
+    global GLM_API_KEY
+    import sys
+    sys.path.insert(0, str(Path.home() / ".ling_lib"))
+    try:
+        from ling_key_store import get_key
+        GLM_API_KEY = get_key("GLM_CODING_PLAN_KEY") or get_key("GLM_API_KEY") or ""
+        _GLM_BASE_URL = get_key("GLM_BASE_URL") or _GLM_BASE_URL
+    except Exception:
+        pass
+
+
+_init_keys()
 GLM_MODELS = [_PRIMARY_MODEL] + [m for m in _FALLBACK_MODELS if m != _PRIMARY_MODEL]
 
 
@@ -185,7 +176,8 @@ def call_llm_with_fallback(
             )
             if model != (primary_model or _PRIMARY_MODEL):
                 logger.info(f"LLM fallback to {model}")
-            return resp
+            _track_usage(model, resp)
+            return resp, model
         except Exception as e:
             err = str(e)
             if "1113" in err or "余额不足" in err or "429" in err:
@@ -217,6 +209,61 @@ def friendly_error(err: Exception) -> str:
 def _next_reset_time_human() -> str:
     """下一次重置的可读时间。"""
     return datetime.fromtimestamp(_next_reset_time()).strftime("%H:%M")
+
+
+def _quota_window_id() -> str:
+    """返回当前配额窗口的标识（锚点时间戳）。"""
+    now = datetime.now()
+    anchor = now.replace(hour=_RESET_ANCHOR_HOUR, minute=_RESET_ANCHOR_MIN, second=0, microsecond=0)
+    anchor_ts = anchor.timestamp()
+    intervals_ago = int((now.timestamp() - anchor_ts) / _RESET_INTERVAL)
+    window_start = anchor_ts + intervals_ago * _RESET_INTERVAL
+    if window_start > now.timestamp():
+        window_start -= _RESET_INTERVAL
+    return str(int(window_start))
+
+
+def _track_usage(model: str, resp: Any) -> None:
+    """记录一次成功的 LLM 调用用量。"""
+    try:
+        window = _quota_window_id()
+        usage = getattr(resp, "usage", None)
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+        total_tokens = getattr(usage, "total_tokens", 0) or 0
+        with _usage_lock:
+            if window not in _usage_tracker:
+                _usage_tracker[window] = {}
+            w = _usage_tracker[window]
+            if model not in w:
+                w[model] = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            m = w[model]
+            m["calls"] += 1
+            m["prompt_tokens"] += prompt_tokens
+            m["completion_tokens"] += completion_tokens
+            m["total_tokens"] += total_tokens
+    except Exception:
+        pass
+
+
+def get_usage_stats() -> dict:
+    """返回用量统计，按配额窗口分组。"""
+    with _usage_lock:
+        current_window = _quota_window_id()
+        current = _usage_tracker.get(current_window, {})
+        total_calls = sum(m["calls"] for m in current.values())
+        total_tokens = sum(m["total_tokens"] for m in current.values())
+        return {
+            "current_window": {
+                "window_id": current_window,
+                "resets_at": datetime.fromtimestamp(_next_reset_time()).strftime("%H:%M"),
+                "seconds_to_reset": _seconds_to_next_reset(),
+                "total_calls": total_calls,
+                "total_tokens": total_tokens,
+                "models": dict(current),
+            },
+            "all_windows": {k: dict(v) for k, v in _usage_tracker.items()},
+        }
 
 
 def create_client() -> Any:

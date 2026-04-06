@@ -640,6 +640,11 @@ def create_app(password: str | None = None):
         from .llm_utils import get_model_status
         return JSONResponse(get_model_status())
 
+    @app.get("/api/usage")
+    async def api_usage():
+        from .llm_utils import get_usage_stats
+        return JSONResponse(get_usage_stats())
+
     @app.post("/api/models")
     async def api_models_probe(request: Request):
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
