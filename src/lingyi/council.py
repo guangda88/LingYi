@@ -225,6 +225,7 @@ def wake_member(member_id: str, disc_id: str) -> Optional[str]:
     - 每个成员同一讨论最多发言 MAX_TURNS_PER_MEMBER 次
     - 同一讨论总消息数不超过 MAX_MESSAGES_PER_DISCUSSION
     - 新消息与该成员上一条消息相似度>80%时跳过（防重复）
+    - 末尾连续3条都是自动回复时跳过（防循环）
     """
     endpoint = MEMBER_ENDPOINTS.get(member_id)
     if not endpoint:
@@ -254,7 +255,18 @@ def wake_member(member_id: str, disc_id: str) -> Optional[str]:
         logger.debug(f"讨论 {disc_id} 无已有消息，不需要唤醒 {member_name}")
         return None
 
-    # Guard 3: deduplication — checked after API call (line 276-280)
+    # Guard 3: check for auto-reply chain at the end
+    recent_auto_chain = 0
+    for m in reversed(messages[-5:]):
+        if "auto_reply" in m.get("tags", []):
+            recent_auto_chain += 1
+        else:
+            break
+    if recent_auto_chain >= 3:
+        logger.info(f"讨论末尾已有 {recent_auto_chain} 条连续自动回复，暂停唤醒 {member_name}")
+        return None
+
+    # Guard 4: deduplication — checked after API call (line 276-280)
     member_msgs = [m for m in messages if m.get("from_id") == member_id]
 
     if endpoint.get("notify_only"):
@@ -266,7 +278,7 @@ def wake_member(member_id: str, disc_id: str) -> Optional[str]:
         logger.info(f"真实API不可用，跳过: {member_name}")
         return None
 
-    # Guard 3: deduplication — check against member's previous messages
+    # Guard 4: deduplication — check against member's previous messages
     if member_msgs:
         last_content = member_msgs[-1].get("content", "")
         if last_content and _is_near_duplicate(result, last_content):
@@ -375,6 +387,16 @@ def council_scan() -> dict:
         if "auto_reply" in messages[-1].get("tags", []):
             continue
 
+        recent_auto_chain = 0
+        for m in reversed(messages[-5:]):
+            if "auto_reply" in m.get("tags", []):
+                recent_auto_chain += 1
+            else:
+                break
+        if recent_auto_chain >= 3:
+            logger.info(f"讨论 '{disc.get('topic', '')[:30]}' 末尾已有 {recent_auto_chain} 条连续自动回复，暂停唤醒")
+            continue
+
         last_msg_time = messages[-1].get("timestamp", "")
         if state.last_scan_time and last_msg_time <= state.last_scan_time:
             continue
@@ -479,7 +501,7 @@ def _check_discussion_health(disc_id: str, disc: dict) -> list[str]:
             recent_auto_chain += 1
         else:
             break
-    if recent_auto_chain >= 5:
+    if recent_auto_chain >= 3:
         alerts.append(f"[自动回复连锁] {disc_id} | {topic} | 末尾连续{recent_auto_chain}条自动回复")
 
     _HALLUCINATION_PATTERNS = [
