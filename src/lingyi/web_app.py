@@ -617,6 +617,7 @@ def create_app(password: str | None = None):
     @app.get("/api/status")
     async def api_status():
         from datetime import datetime
+        from .llm_utils import get_model_status
         return JSONResponse({
             "service": "灵依",
             "uptime_port": 8900,
@@ -628,10 +629,30 @@ def create_app(password: str | None = None):
                 "last_reminder_hour": _last_reminder_hour,
                 "last_lingmsg_count": _last_lingmsg_count,
             },
+            "models": get_model_status(),
             "timestamp": datetime.now().isoformat(),
         })
 
     # ── 灵信 API ──────────────────────────────────────────
+
+    @app.get("/api/models")
+    async def api_models():
+        from .llm_utils import get_model_status
+        return JSONResponse(get_model_status())
+
+    @app.post("/api/models")
+    async def api_models_probe(request: Request):
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        action = body.get("action", "") or request.query_params.get("action", "")
+        if action == "probe":
+            from .llm_utils import probe_premium_models, get_model_status
+            probe = probe_premium_models()
+            results = []
+            for model, st in probe.items():
+                results.append({"model": model, "available": st == "available", "reason": "" if st == "available" else st})
+            return JSONResponse({"results": results, "status": get_model_status()})
+        return JSONResponse({"error": "unknown action"}, status_code=400)
+
     @app.get("/api/lingmessage")
     async def api_lingmessage(status: str | None = "open"):
         from .lingmessage import list_discussions
