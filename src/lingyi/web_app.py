@@ -366,6 +366,7 @@ def create_app(password: str | None = None):
             "/api/preferences", "/api/briefing",
             "/api/status", "/api/models",
             "/api/usage", "/api/council",
+            "/api/logs",
             "/ws/"
         }
 
