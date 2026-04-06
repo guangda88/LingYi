@@ -441,7 +441,11 @@ def create_app(password: str | None = None):
 
     # ── 静态页面 ──────────────────────────────────────────
     @app.get("/", response_class=HTMLResponse)
-    async def index():
+    async def index(request: Request):
+        if _auth_enabled:
+            token = request.cookies.get("lingyi_token", "")
+            if not _check_auth(token):
+                return HTMLResponse('<script>location.href="/login"</script>')
         return HTMLResponse((_TEMPLATE_DIR / "index.html").read_text("utf-8"))
 
     # ── 仪表盘 API ────────────────────────────────────────

@@ -295,7 +295,7 @@ const _NAME_MAP = {
   lingflow:'灵通', lingclaude:'灵克', lingzhi:'灵知',
   lingyi:'灵依', lingtongask:'灵通问道', lingterm:'灵犀',
   lingminopt:'灵极优', lingresearch:'灵研', zhibridge:'智桥',
-  guangda:'广大老师',
+  lingyang:'灵扬', guangda:'广大老师',
 };
 function memberName(id) { return _NAME_MAP[id] || id; }
 
@@ -499,7 +499,7 @@ async function newDiscussion() {
     await authFetch('/api/lingmessage/send', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({topic: topic, content: '灵依发起讨论：' + topic})
+      body: JSON.stringify({topic: topic, content: '发起讨论：' + topic, from_id: 'guangda'})
     });
     loadCouncil();
   } catch(e) {}
@@ -514,7 +514,7 @@ async function replyDiscussion(discId, topic) {
     await authFetch('/api/lingmessage/send', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({topic: topic, content: content})
+      body: JSON.stringify({topic: topic, content: content, from_id: 'guangda'})
     });
     showDiscDetail(discId);
   } catch(e) {}
@@ -622,7 +622,12 @@ function connectWS() {
   if (!_authToken) {
     _wsRetryCount++;
     if (_wsRetryCount <= _wsMaxRetries) {
-      setTimeout(connectWS, 2000);
+      setTimeout(connectWS, 3000);
+    } else {
+      if (document.getElementById('pgChat')) {
+        addChatMsg('system', '⚠️ 未登录，3秒后自动跳转到登录页...');
+        setTimeout(function() { location.href = '/login'; }, 3000);
+      }
     }
     return;
   }
@@ -631,12 +636,24 @@ function connectWS() {
   ws = new WebSocket(directUrl);
   useBridge = false;
   ws.onopen = function() { _wsRetryCount = 0; addChatMsg('system', '灵依已上线 ✓'); };
-  ws.onclose = function() {
+  ws.onclose = function(ev) {
+    var reason = ev.reason || '';
+    if (ev.code === 4001 || reason === 'unauthorized') {
+      addChatMsg('system', '⚠️ 登录已过期，请刷新页面重新登录');
+      return;
+    }
     _wsRetryCount++;
-    if (_wsRetryCount <= 3) addChatMsg('system', '连接断开，重连中...');
+    if (_wsRetryCount <= 3) addChatMsg('system', '连接断开，重连中...（第' + _wsRetryCount + '次）');
+    if (_wsRetryCount > _wsMaxRetries) {
+      addChatMsg('system', '❌ 无法连接服务器，请检查网络后刷新页面');
+      return;
+    }
     setTimeout(connectWS, 5000);
   };
-  ws.onerror = function() {};
+  ws.onerror = function(ev) {
+    console.error('WebSocket error:', ev);
+    addChatMsg('system', '⚠️ 连接出错，正在尝试重连...');
+  };
   ws.onmessage = onDirectMsg;
 }
 

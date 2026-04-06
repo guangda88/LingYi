@@ -44,6 +44,7 @@ PROJECTS = {
     "lingresearch": {"name": "灵妍", "role": "科研优化"},
     "zhibridge": {"name": "智桥", "role": "HTTP中继"},
     "lingyang": {"name": "灵扬", "role": "对外窗口"},
+    "guangda": {"name": "广大老师", "role": "人类用户"},
 }
 
 
