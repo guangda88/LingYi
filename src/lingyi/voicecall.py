@@ -6,7 +6,6 @@
 import importlib.util
 import json
 import logging
-import os
 import subprocess
 import tempfile
 import wave
@@ -281,7 +280,7 @@ def _build_system_prompt() -> str:
 
     return "\n\n".join(parts)
 
-from .llm_utils import GLM_API_KEY as _GLM_API_KEY, GLM_BASE_URL as _GLM_BASE_URL, create_client, call_llm_with_fallback, friendly_error
+from .llm_utils import create_client, call_llm_with_fallback, friendly_error
 _GLM_MODEL = "glm-4.5-air"
 
 

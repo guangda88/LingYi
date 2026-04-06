@@ -78,8 +78,7 @@ def _build_system_prompt_impl(base_prompt: str) -> str:
     parts = [base_prompt, ""]
 
     parts.append("\n【附加工具能力】除了上面提到的工具，你还拥有以下能力：")
-    parts.append("  - shell_exec: 执行任意 shell 命令（查数据、看日志、跑脚本）")
-    parts.append("  - file_read: 读取任意文件内容（带行号）")
+    parts.append("  - file_read: 读取文件内容（带行号，限白名单目录）")
     parts.append("  - git_status: 查看 Git 仓库状态")
     parts.append("  - code_stats: 统计灵字辈项目代码量")
     parts.append("  - search_web: 搜索网络")
@@ -324,8 +323,8 @@ def create_app(password: str | None = None):
     async def auth_middleware(request: Request, call_next):
         path = request.url.path
         # 公开端点列表（明确列出）
-        public_paths = {"/", "/login", "/api/discuss", "/api/lingmessage/notify"}
-        public_prefixes = {"/api/login", "/static", "/favicon"}
+        public_paths = {"/", "/login"}
+        public_prefixes = {"/api/login", "/static", "/favicon", "/api/lingmessage/notify"}
 
         # 检查是否是公开路径
         if path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
@@ -345,8 +344,7 @@ def create_app(password: str | None = None):
 
     app.add_middleware(
         CORSMiddleware,
-        # 限制允许的来源（生产环境应配置具体域名）
-        allow_origins=["*"],
+        allow_origins=["http://localhost:8900", "http://127.0.0.1:8900"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
@@ -682,9 +680,13 @@ def create_app(password: str | None = None):
         return JSONResponse(_serialize(msg))
 
     @app.post("/api/lingmessage/notify")
-    async def api_lingmessage_notify(request: dict):
-        from_id = request.get("from", "?")
-        topic = request.get("topic", "?")
+    async def api_lingmessage_notify(request: Request):
+        client_host = request.client.host if request.client else ""
+        if client_host not in ("127.0.0.1", "::1", "localhost"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        body = await request.json()
+        from_id = body.get("from", "?")
+        topic = body.get("topic", "?")
         logger.info(f"灵信通知: {from_id} 在 [{topic}] 发了新消息")
         preview = f"收到灵信: {_project_cn(from_id)} 在「{topic}」发了新消息"
         await _push_to_all("lingmessage", preview)
@@ -836,7 +838,6 @@ def create_app(password: str | None = None):
         logger.info(f"Starting chat with text: {text[:50]}...")
         try:
             client = OpenAI(api_key=_GLM_API_KEY, base_url=_GLM_BASE_URL, max_retries=0)
-            logger.info(f"OpenAI client created, API key: {_GLM_API_KEY[:10]}...")
         except Exception as e:
             logger.error(f"Failed to create OpenAI client: {e}")
             return f"⚠️ 无法连接到AI服务：{str(e)}"

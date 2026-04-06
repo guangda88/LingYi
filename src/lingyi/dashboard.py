@@ -7,12 +7,12 @@
 - 异常检测
 """
 
+import html as _html
 import json
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List
 
 from .briefing import collect_all
 from .trends import TrendAnalyzer, TrendAnalysis
@@ -242,6 +242,11 @@ def generate_dashboard(data: Dict = None) -> str:
     return html
 
 
+def _e(value) -> str:
+    """HTML转义辅助函数"""
+    return _html.escape(str(value))
+
+
 def _build_status_cards(data: Dict, weekly_report) -> str:
     """构建状态卡片"""
     cards = []
@@ -261,7 +266,7 @@ def _build_status_cards(data: Dict, weekly_report) -> str:
                     {'在线' if available else '离线'}
                 </span>
             </div>
-            <div class="metric-value">{queries}</div>
+            <div class="metric-value">{_e(queries)}</div>
             <div>累计查询</div>
             {_format_change(trend)}
         </div>
@@ -283,8 +288,8 @@ def _build_status_cards(data: Dict, weekly_report) -> str:
                     {'在线' if available else '离线'}
                 </span>
             </div>
-            <div class="metric-value">{feedbacks}</div>
-            <div>反馈 / 趋势报告: {trends} / 每日简报: {daily}</div>
+            <div class="metric-value">{_e(feedbacks)}</div>
+            <div>反馈 / 趋势报告: {_e(trends)} / 每日简报: {_e(daily)}</div>
         </div>
     """)
 
@@ -302,7 +307,7 @@ def _build_status_cards(data: Dict, weekly_report) -> str:
                     {'在线' if available else '离线'}
                 </span>
             </div>
-            <div class="metric-value">{sessions}</div>
+            <div class="metric-value">{_e(sessions)}</div>
             <div>会话记录</div>
         </div>
     """)
@@ -325,11 +330,11 @@ def _build_status_cards(data: Dict, weekly_report) -> str:
                     {'在线' if available else '离线'}
                 </span>
             </div>
-            <div class="metric-value">{comments}</div>
-            <div>评论 / 粉丝: {comments} / {users}</div>
+            <div class="metric-value">{_e(comments)}</div>
+            <div>评论 / 粉丝: {_e(comments)} / {_e(users)}</div>
             <div style="margin-top: 8px;">
-                <span style="color: #28a745;">积极 {positive}</span> •
-                <span style="color: #dc3545;">消极 {negative}</span>
+                <span style="color: #28a745;">积极 {_e(positive)}</span> •
+                <span style="color: #dc3545;">消极 {_e(negative)}</span>
             </div>
         </div>
     """)
@@ -436,8 +441,8 @@ def _build_anomaly_list(anomalies: List[Dict]) -> str:
     items = []
     for a in anomalies:
         items.append(
-            f"<li>{a['metric']}: {a['value']:.0f} "
-            f"(预期: {a['expected']}, 偏差: {a['deviation']:.1f}σ)</li>"
+            f"<li>{_e(a['metric'])}: {a['value']:.0f} "
+            f"(预期: {_e(a['expected'])}, 偏差: {a['deviation']:.1f}σ)</li>"
         )
     return "\n".join(items)
 
@@ -465,8 +470,6 @@ def save_dashboard(output_path: Path = None) -> Path:
 
 def main():
     """CLI 入口"""
-    import sys
-
     output_path = save_dashboard()
     print(f"✅ 仪表板已生成: {output_path}")
     print(f"   在浏览器中打开: file://{output_path.absolute()}")
@@ -475,4 +478,5 @@ def main():
 
 
 if __name__ == "__main__":
+    import sys
     sys.exit(main())

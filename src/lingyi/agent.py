@@ -12,17 +12,15 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import urllib.parse
 import urllib.request
-from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
 _DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 
-from .llm_utils import GLM_API_KEY as _GLM_API_KEY, GLM_BASE_URL as _GLM_BASE_URL, create_client, call_llm_with_fallback, friendly_error
+from .llm_utils import create_client, call_llm_with_fallback, friendly_error
 
 _ToolFn = Callable[..., str]
 

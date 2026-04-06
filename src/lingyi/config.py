@@ -1,7 +1,6 @@
 """加载用户私有预设数据（~/.lingyi/presets.json）。"""
 
 import json
-from pathlib import Path
 
 from .db import DB_DIR
 

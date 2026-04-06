@@ -9,7 +9,6 @@
 
 import json
 import logging
-import os
 import ssl
 import time
 import urllib.error
@@ -22,7 +21,7 @@ from .lingmessage import (
     PROJECTS, _ensure_store, _load_index, _load_discussion,
     _project_name, _now,
 )
-from .llm_utils import create_client, call_llm_with_fallback, friendly_error
+from .llm_utils import create_client, call_llm_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -255,14 +254,8 @@ def wake_member(member_id: str, disc_id: str) -> Optional[str]:
         logger.debug(f"讨论 {disc_id} 无已有消息，不需要唤醒 {member_name}")
         return None
 
-    # Guard 3: deduplication — compare with member's last message
+    # Guard 3: deduplication — checked after API call (line 276-280)
     member_msgs = [m for m in messages if m.get("from_id") == member_id]
-    if member_msgs:
-        last_content = member_msgs[-1].get("content", "")
-        # Simple word overlap check
-        if last_content and _is_near_duplicate(last_content, ""):
-            # Will check after getting actual response
-            pass
 
     if endpoint.get("notify_only"):
         _send_notify_to_member(member_id, disc, disc_id)

@@ -33,7 +33,7 @@ GLM_BASE_URL = _GLM_BASE_URL
 
 
 def _init_keys() -> None:
-    global GLM_API_KEY
+    global GLM_API_KEY, _GLM_BASE_URL
     import sys
     sys.path.insert(0, str(Path.home() / ".ling_lib"))
     try:
@@ -73,7 +73,6 @@ def _seconds_to_next_reset() -> int:
 def _clear_expired_quotas() -> None:
     """清除已过重置时刻的配额缓存。"""
     now = time.time()
-    next_reset = _next_reset_time()
     expired = [m for m, ts in _quota_exhausted.items() if now >= ts]
     for m in expired:
         del _quota_exhausted[m]
