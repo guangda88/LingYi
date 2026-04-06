@@ -94,3 +94,20 @@ def register(group: click.Group):
             click.echo(f"✓ 讨论已关闭: {discussion_id}")
         else:
             click.echo(f"关闭失败：讨论不存在: {discussion_id}")
+
+    @group.command("msg-annotate")
+    @click.argument("discussion_id")
+    def msg_annotate(discussion_id: str):
+        """自动标注讨论中的消息来源"""
+        result = lm.annotate_discussion(discussion_id)
+        if "error" in result:
+            click.echo(f"错误: {result['error']}")
+            return
+        click.echo(f"讨论: {discussion_id}")
+        click.echo(f"  总消息: {result['total_messages']}")
+        click.echo(f"  时间异常: {result['anomalies']}")
+        click.echo(f"  已更新标注: {result['updated']}")
+        if result["anomaly_details"]:
+            click.echo("\n异常详情:")
+            for detail in result["anomaly_details"]:
+                click.echo(f"  ⚠️  {detail}")

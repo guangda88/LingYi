@@ -27,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 _STORE_DIR = Path(os.environ.get("LINGMESSAGE_DIR", "/home/ai/.lingmessage"))
 
+SOURCE_TYPE_LABELS = {
+    "real": "✅ 真实通信",
+    "inferred": "🔮 AI推演",
+    "unverifiable": "⚠️ 无法验证",
+}
+
 PROJECTS = {
     "lingflow": {"name": "灵通", "role": "工作流引擎"},
     "lingclaude": {"name": "灵克", "role": "编程助手"},
@@ -411,8 +417,11 @@ def format_discussion_thread(disc: dict) -> str:
         reply_marker = ""
         if msg.get("reply_to"):
             reply_marker = f"  ↳ 回复 {msg['reply_to'][:20]}..."
+        source = msg.get("source_type", "unverifiable")
+        source_label = SOURCE_TYPE_LABELS.get(source, source)
         lines.append(f"\n💬 {msg.get('from_name', msg.get('from_id', '?'))} "
                      f"[{msg.get('timestamp', '')[:16].replace('T', ' ')}]{reply_marker}")
+        lines.append(f"   [{source_label}]")
         lines.append(f"   {msg.get('content', '')}")
         if msg.get("tags"):
             lines.append(f"   标签: {', '.join(msg['tags'])}")
@@ -422,10 +431,97 @@ def format_discussion_thread(disc: dict) -> str:
 
 def format_message(msg: Message) -> str:
     """格式化单条消息。"""
+    source_label = SOURCE_TYPE_LABELS.get(msg.source_type, msg.source_type)
     lines = [
         f"💬 {msg.from_name} [{msg.timestamp[:16].replace('T', ' ')}]",
+        f"   [{source_label}]",
         f"   {msg.content}",
     ]
     if msg.tags:
         lines.append(f"   标签: {', '.join(msg.tags)}")
     return "\n".join(lines)
+
+
+def _is_auto_reply(msg: dict) -> bool:
+    return "auto_reply" in msg.get("tags", [])
+
+
+def detect_temporal_anomalies(disc: dict, threshold_seconds: float = 2.0) -> list:
+    """检测时间间隔异常——同秒或极短时间内多个'不同成员'发言。
+
+    返回 [(msg_index, anomaly_description), ...]
+    """
+    messages = disc.get("messages", [])
+    if len(messages) < 2:
+        return []
+
+    anomalies = []
+    prev_time = None
+    prev_from = None
+    streak = 0
+
+    for i, msg in enumerate(messages):
+        ts_str = msg.get("timestamp", "")
+        try:
+            ts = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            continue
+
+        cur_from = msg.get("from_id", "")
+
+        if prev_time is not None:
+            delta = (ts - prev_time).total_seconds()
+            if delta <= threshold_seconds and cur_from != prev_from:
+                streak += 1
+                if streak >= 2:
+                    anomalies.append((
+                        i,
+                        f"连续{streak + 1}个不同成员在{delta:.0f}秒内发言: "
+                        f"{msg.get('from_name', cur_from)} @ {ts_str}"
+                    ))
+            else:
+                streak = 0
+
+        prev_time = ts
+        prev_from = cur_from
+
+    return anomalies
+
+
+def annotate_discussion(disc_id: str) -> dict:
+    """对已有讨论执行自动标注，返回标注结果。"""
+    store = _get_store()
+    if not store.exists():
+        return {"error": "存储不存在"}
+
+    disc = _load_discussion(store, disc_id)
+    if not disc:
+        return {"error": f"讨论 {disc_id} 不存在"}
+
+    anomalies = detect_temporal_anomalies(disc)
+    anomaly_indices = {idx for idx, _ in anomalies}
+
+    changed = 0
+    for i, msg in enumerate(disc.get("messages", [])):
+        if msg.get("source_type") in ("real",):
+            continue
+
+        if i in anomaly_indices or _is_auto_reply(msg):
+            new_type = "inferred"
+        else:
+            new_type = "unverifiable"
+
+        if msg.get("source_type") != new_type:
+            msg["source_type"] = new_type
+            changed += 1
+
+    if changed > 0:
+        _save_discussion(store, disc)
+
+    return {
+        "discussion_id": disc_id,
+        "total_messages": len(disc.get("messages", [])),
+        "anomalies": len(anomalies),
+        "updated": changed,
+        "anomaly_details": [desc for _, desc in anomalies],
+    }
