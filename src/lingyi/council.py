@@ -324,7 +324,14 @@ def _judge_discussion_with_llm(disc: dict) -> Optional[dict]:
         content = content.strip()
         if content.startswith("```"):
             content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        return json.loads(content)
+        result = json.loads(content)
+        if not isinstance(result, dict):
+            return None
+        result.setdefault("should_continue", False)
+        result.setdefault("next_speakers", [])
+        result.setdefault("reason", "")
+        result.setdefault("consensus_reached", False)
+        return result
     except Exception as e:
         logger.error(f"灵依判断讨论状态失败: {e}")
         return None

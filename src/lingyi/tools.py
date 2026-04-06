@@ -498,7 +498,7 @@ def _file_read(path: str, lines: int = 100, offset: int = 0) -> str:
         end = min(total, start + lines)
         selected = all_lines[start:end]
         header = f"文件: {p} (共{total}行, 显示 {start+1}-{end})\n"
-        numbered = "\n".join(f"{start+i+1:6d}| {l}" for i, l in enumerate(selected))
+        numbered = "\n".join(f"{start+i+1:6d}| {line}" for i, line in enumerate(selected))
         return header + numbered
     except Exception as e:
         return f"读取失败: {e}"
@@ -514,7 +514,8 @@ _register("file_read", "读取文件内容（带行号）", {
 # ── Git 状态 ──────────────────────────────────────────
 
 def _git_status(project: str = "") -> str:
-    import subprocess, os
+    import os
+    import subprocess
     projects = {
         "灵通": "/home/ai/LingFlow",
         "灵知": "/home/ai/zhineng-knowledge-system",
@@ -543,7 +544,7 @@ def _git_status(project: str = "") -> str:
                                    capture_output=True, text=True, timeout=5).stdout.strip()
             dirty = subprocess.run(["git", "-C", path, "status", "--porcelain"],
                                    capture_output=True, text=True, timeout=5).stdout.strip()
-            dirty_count = len([l for l in dirty.splitlines() if l.strip()]) if dirty else 0
+            dirty_count = len([ln for ln in dirty.splitlines() if ln.strip()]) if dirty else 0
             status = f"修改{dirty_count}个文件" if dirty_count else "干净"
             results.append(f"{name} [{branch}] {status}\n  最近: {short}")
         except Exception as e:

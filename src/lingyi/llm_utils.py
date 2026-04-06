@@ -34,10 +34,15 @@ GLM_BASE_URL = _GLM_BASE_URL
 
 def _init_keys() -> None:
     global GLM_API_KEY, _GLM_BASE_URL
-    import sys
-    sys.path.insert(0, str(Path.home() / ".ling_lib"))
+    import importlib.util
+    lib_path = Path.home() / ".ling_lib" / "ling_key_store.py"
+    if not lib_path.exists():
+        return
     try:
-        from ling_key_store import get_key
+        spec = importlib.util.spec_from_file_location("ling_key_store", lib_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        get_key = mod.get_key
         GLM_API_KEY = get_key("GLM_CODING_PLAN_KEY") or get_key("GLM_API_KEY") or ""
         _GLM_BASE_URL = get_key("GLM_BASE_URL") or _GLM_BASE_URL
     except Exception:

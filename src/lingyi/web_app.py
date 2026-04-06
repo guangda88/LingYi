@@ -13,6 +13,8 @@ import logging
 import os
 import secrets
 import tempfile
+import time
+from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -172,6 +174,37 @@ def _call_llm_with_fallback(client: Any, messages: list, tools_schema: list | No
 
 _SESSIONS: dict[str, datetime] = {}
 _PERSISTENT_TOKEN_PATH = Path.home() / ".lingyi" / ".web_tokens"
+_MAX_SESSIONS = 200
+
+_LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SEC = 300
+
+
+def _cleanup_sessions():
+    """清理过期会话，超过上限时裁剪最旧的"""
+    now = datetime.now()
+    expired = [t for t, exp in _SESSIONS.items() if exp < now]
+    for t in expired:
+        del _SESSIONS[t]
+    if len(_SESSIONS) > _MAX_SESSIONS:
+        by_age = sorted(_SESSIONS.items(), key=lambda x: x[1])
+        for t, _ in by_age[: len(_SESSIONS) - _MAX_SESSIONS]:
+            del _SESSIONS[t]
+
+
+def _check_login_rate(ip: str) -> bool:
+    """检查IP是否超过登录尝试限制。返回True表示允许"""
+    now = time.time()
+    attempts = _LOGIN_ATTEMPTS[ip]
+    _LOGIN_ATTEMPTS[ip] = [t for t in attempts if now - t < _LOGIN_WINDOW_SEC]
+    if len(_LOGIN_ATTEMPTS[ip]) >= _LOGIN_MAX_ATTEMPTS:
+        return False
+    return True
+
+
+def _record_login_attempt(ip: str):
+    _LOGIN_ATTEMPTS[ip].append(time.time())
 
 
 def _load_persistent_tokens() -> dict[str, str]:
@@ -358,11 +391,19 @@ def create_app(password: str | None = None):
 
     @app.post("/api/login")
     async def api_login(request: Request):
+        ip = request.client.host if request.client else "unknown"
+        if not _check_login_rate(ip):
+            return JSONResponse(
+                {"error": "登录尝试过多，请5分钟后重试"},
+                status_code=429,
+            )
+
         body = await request.json()
         pwd = body.get("password", "")
         remember = body.get("remember", False)
         if _check_password(pwd, _web_pwd_hash):
             token = secrets.token_hex(32)
+            _cleanup_sessions()
             if remember:
                 expires = datetime.now() + timedelta(days=30)
                 _SESSIONS[token] = expires
@@ -374,6 +415,7 @@ def create_app(password: str | None = None):
                 resp = JSONResponse({"ok": True})
                 resp.set_cookie("lingyi_token", token, max_age=86400, samesite="lax")
             return resp
+        _record_login_attempt(ip)
         return JSONResponse({"error": "密码错误"}, status_code=403)
 
     @app.post("/api/logout")

@@ -20,7 +20,7 @@ def register(group: click.Group):
             return
         lm.init_store()
         msg = lm.send_message(from_id, topic, content)
-        click.echo(f"✓ 消息已发送")
+        click.echo("✓ 消息已发送")
         click.echo(lm.format_message(msg))
 
     @group.command("msg-list")
