@@ -35,8 +35,9 @@ PROJECTS = {
     "lingtongask": {"name": "灵通问道", "role": "内容平台"},
     "lingterm": {"name": "灵犀", "role": "终端感知"},
     "lingminopt": {"name": "灵极优", "role": "自优化框架"},
-    "lingresearch": {"name": "灵研", "role": "科研优化"},
+    "lingresearch": {"name": "灵妍", "role": "科研优化"},
     "zhibridge": {"name": "智桥", "role": "HTTP中继"},
+    "lingyang": {"name": "灵扬", "role": "对外窗口"},
 }
 
 
@@ -50,6 +51,7 @@ class Message:
     timestamp: str
     reply_to: Optional[str] = None
     tags: list = field(default_factory=list)
+    source_type: str = "unverifiable"  # "real" | "inferred" | "unverifiable"
 
 
 @dataclass
@@ -149,6 +151,10 @@ def _update_index_entry(store: Path, disc: dict) -> None:
     for i, item in enumerate(index):
         item_id = item.get("id") or item.get("thread_id", "")
         if item_id == disc_id:
+            if "thread_id" in item:
+                entry["thread_id"] = item["thread_id"]
+            if item.get("channel"):
+                entry["channel"] = item["channel"]
             index[i] = entry
             found = True
             break
@@ -190,12 +196,25 @@ def _ping_notify(from_id: str, disc_id: str, topic: str) -> None:
         "timestamp": _now(),
     }, ensure_ascii=False).encode("utf-8")
 
+    # Map from_id to notification target name — skip self to prevent loops
+    _FROM_TO_TARGET = {
+        "lingzhi": "灵知",
+        "lingclaude": "灵克",
+        "lingyi": "灵依",
+    }
+    skip_target = _FROM_TO_TARGET.get(from_id)
+
     targets = [
         ("灵知", "http://127.0.0.1:8000/api/v1/lingmessage/notify"),
         ("灵依", "https://127.0.0.1:8900/api/lingmessage/notify"),
         ("灵克", "http://127.0.0.1:8700/api/lingmessage/notify"),
+        ("灵知(auto)", "http://127.0.0.1:8011/api/lingmessage/notify"),
+        ("灵极优", "http://127.0.0.1:8002/api/lingmessage/notify"),
+        ("灵妍", "http://127.0.0.1:8003/api/lingmessage/notify"),
     ]
     for name, url in targets:
+        if name == skip_target:
+            continue
         try:
             req = urllib.request.Request(
                 url, data=payload,
@@ -218,7 +237,8 @@ def _ping_notify(from_id: str, disc_id: str, topic: str) -> None:
 
 def send_message(from_id: str, topic: str, content: str,
                  reply_to: Optional[str] = None,
-                 tags: Optional[list] = None) -> Message:
+                 tags: Optional[list] = None,
+                 source_type: str = "real") -> Message:
     """发送消息。如果话题已有讨论，追加到该讨论；否则创建新讨论。"""
     store = _ensure_store()
     from_name = _project_name(from_id)
@@ -231,6 +251,7 @@ def send_message(from_id: str, topic: str, content: str,
         timestamp=_now(),
         reply_to=reply_to,
         tags=tags or [],
+        source_type=source_type,
     )
 
     index = _load_index(store)
@@ -291,7 +312,8 @@ def read_discussion(discussion_id: str) -> Optional[dict]:
 
 def reply_to_discussion(discussion_id: str, from_id: str, content: str,
                         reply_to: Optional[str] = None,
-                        tags: Optional[list] = None) -> Optional[Message]:
+                        tags: Optional[list] = None,
+                        source_type: str = "real") -> Optional[Message]:
     """回复讨论。"""
     store = _get_store()
     disc_data = _load_discussion(store, discussion_id)
@@ -310,6 +332,7 @@ def reply_to_discussion(discussion_id: str, from_id: str, content: str,
         timestamp=_now(),
         reply_to=reply_to,
         tags=tags or [],
+        source_type=source_type,
     )
     disc_data["messages"].append(asdict(msg))
     disc_data["updated_at"] = _now()

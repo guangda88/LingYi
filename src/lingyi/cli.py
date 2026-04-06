@@ -18,6 +18,7 @@ from .commands import briefing as briefing_cmds
 from .commands import lingmessage as lingmessage_cmds
 from .commands import web as web_cmds
 from .commands import voicecall as voicecall_cmds
+from .commands import council as council_cmds
 
 
 @click.group()
@@ -78,6 +79,7 @@ briefing_cmds.register(cli)
 lingmessage_cmds.register(cli)
 web_cmds.register(cli)
 voicecall_cmds.register(cli)
+council_cmds.register(cli)
 
 
 @cli.command("patrol")

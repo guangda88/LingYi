@@ -281,51 +281,46 @@ def _build_system_prompt() -> str:
 
     return "\n\n".join(parts)
 
-_DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+from .llm_utils import GLM_API_KEY as _GLM_API_KEY, GLM_BASE_URL as _GLM_BASE_URL, create_client, call_llm_with_fallback, friendly_error
+_GLM_MODEL = "glm-4.5-air"
 
 
 def _chat_llm(conversation: list[dict]) -> str:
-    """用通义千问生成对话回复，支持 function calling。"""
-    import dashscope
-    from dashscope import Generation
+    """用 GLM 生成对话回复，支持 function calling。"""
     from .tools import get_tools, execute_tool
 
-    dashscope.api_key = _DASHSCOPE_API_KEY
+    client = create_client()
     system_prompt = _build_system_prompt()
     messages = [{"role": "system", "content": system_prompt}] + conversation[-20:]
     tools = get_tools()
 
-    resp = Generation.call(
-        model="qwen-turbo",
-        messages=messages,
-        tools=tools,
-        result_format="message",
-    )
+    try:
+        resp = call_llm_with_fallback(client, messages, tools=tools)
+    except Exception as e:
+        logger.warning(f"GLM call failed: {e}")
+        return friendly_error(e)
 
-    if resp.status_code != 200:
-        logger.warning(f"Qwen call failed: {resp.status_code}")
+    choice = resp.choices[0]
+    msg = choice.message
+
+    if msg.content:
+        return msg.content.strip()
+
+    if not msg.tool_calls:
         return ""
 
-    choices = resp.output.get("choices", [])
-    if not choices:
-        return ""
+    messages.append({"role": "assistant", "content": None,
+                     "tool_calls": [{"id": tc.id, "type": "function",
+                                     "function": {"name": tc.function.name,
+                                                   "arguments": tc.function.arguments}}
+                                    for tc in msg.tool_calls]})
 
-    msg = choices[0]["message"]
-
-    if msg.get("content"):
-        return msg["content"].strip()
-
-    tool_calls = msg.get("tool_calls", [])
-    if not tool_calls:
-        return ""
-
-    messages.append(msg)
     results = []
-    for tc in tool_calls:
-        fn = tc["function"]
-        name = fn["name"]
+    for tc in msg.tool_calls:
+        fn = tc.function
+        name = fn.name
         try:
-            args = json.loads(fn["arguments"])
+            args = json.loads(fn.arguments or "{}")
         except Exception:
             args = {}
         logger.info(f"[工具调用] {name}({args})")
@@ -335,20 +330,19 @@ def _chat_llm(conversation: list[dict]) -> str:
         messages.append({
             "role": "tool",
             "content": result,
-            "tool_call_id": tc.get("id", ""),
-            "name": name,
+            "tool_call_id": tc.id,
         })
 
-    resp2 = Generation.call(
-        model="qwen-turbo",
-        messages=messages,
-        tools=tools,
-        result_format="message",
-    )
-    if resp2.status_code == 200:
-        choices2 = resp2.output.get("choices", [])
-        if choices2 and choices2[0]["message"].get("content"):
-            return choices2[0]["message"]["content"].strip()
+    try:
+        resp2 = client.chat.completions.create(
+            model=_GLM_MODEL,
+            messages=messages,
+            tools=tools,
+        )
+        if resp2.choices and resp2.choices[0].message.content:
+            return resp2.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"GLM second call failed: {e}")
 
     return "\n".join(results)
 

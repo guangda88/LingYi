@@ -8,7 +8,6 @@
 
 import asyncio
 import base64
-import hashlib
 import json
 import logging
 import os
@@ -17,11 +16,161 @@ import tempfile
 from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+if not _DASHSCOPE_API_KEY:
+    _key_file = Path.home() / ".dashscope_api_key"
+    if _key_file.exists():
+        _DASHSCOPE_API_KEY = _key_file.read_text(encoding="utf-8").strip()
+
+_GLM_API_KEY = os.environ.get(
+    "GLM_CODING_PLAN_KEY",
+    os.environ.get("GLM_API_KEY", "")
+)
+if not _GLM_API_KEY:
+    for _kf in [
+        Path.home() / ".glm_api_key",
+        Path("/home/ai/zhineng-knowledge-system/.env"),
+    ]:
+        if _kf.exists() and _kf.suffix == ".env":
+            for _line in _kf.read_text(encoding="utf-8").splitlines():
+                _line = _line.strip()
+                if _line.startswith("GLM_CODING_PLAN_KEY="):
+                    _GLM_API_KEY = _line.split("=", 1)[1].strip()
+                    break
+                if _line.startswith("GLM_API_KEY=") and not _GLM_API_KEY:
+                    _GLM_API_KEY = _line.split("=", 1)[1].strip()
+            if _GLM_API_KEY:
+                break
+        elif _kf.exists():
+            _GLM_API_KEY = _kf.read_text(encoding="utf-8").strip()
+            break
+_GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+_GLM_MODEL = os.environ.get("GLM_MODEL", "glm-5.1")
+
+# 系统提示词缓存（5分钟过期）
+_SYSTEM_PROMPT_CACHE: dict[str, tuple[str, datetime]] = {}
+_CACHE_EXPIRE_SECONDS = 300
+
+def _get_cached_system_prompt() -> str:
+    """获取缓存的系统提示词，如果缓存过期则重新构建"""
+    from .agent import _SYSTEM_PROMPT_BASE
+
+    cache_key = "system_prompt"
+    now = datetime.now()
+
+    if cache_key in _SYSTEM_PROMPT_CACHE:
+        cached_prompt, cache_time = _SYSTEM_PROMPT_CACHE[cache_key]
+        if (now - cache_time).total_seconds() < _CACHE_EXPIRE_SECONDS:
+            return cached_prompt
+
+    # 缓存未命中或过期，重新构建
+    prompt = _build_system_prompt_impl(_SYSTEM_PROMPT_BASE)
+    _SYSTEM_PROMPT_CACHE[cache_key] = (prompt, now)
+    return prompt
+
+def _build_system_prompt_impl(base_prompt: str) -> str:
+    """实际构建系统提示词的实现"""
+    parts = [base_prompt, ""]
+
+    parts.append("\n【附加工具能力】除了上面提到的工具，你还拥有以下能力：")
+    parts.append("  - shell_exec: 执行任意 shell 命令（查数据、看日志、跑脚本）")
+    parts.append("  - file_read: 读取任意文件内容（带行号）")
+    parts.append("  - git_status: 查看 Git 仓库状态")
+    parts.append("  - code_stats: 统计灵字辈项目代码量")
+    parts.append("  - search_web: 搜索网络")
+    parts.append("  - check_github / check_pypi: 查开源项目数据")
+    parts.append("  - ai_news: 获取最新 AI 行业新闻")
+    parts.append("")
+    parts.append("【灵字辈 GitHub 仓库映射】")
+    parts.append("  - 灵通 LingFlow: guangda88/lingflow")
+    parts.append("  - 灵克 LingClaude: guangda88/lingclaude")
+    parts.append("  - 灵依 LingYi: guangda88/lingyi")
+    parts.append("  - 灵知 LingZhi: guangda88/zhineng-knowledge-system")
+    parts.append("当灵通老师提到某个灵字辈项目的GitHub时，你应该直接调用 check_github，不要问仓库名。")
+
+    try:
+        from .schedule import format_today
+        today = format_today()
+        if today:
+            parts.append("【今日日程】\n" + today)
+    except Exception:
+        pass
+
+    try:
+        from .memo import list_memos
+        memos = list_memos()
+        if memos:
+            recent = memos[:5]
+            lines = [f"  - {m.content}" for m in recent]
+            parts.append("【最近备忘】\n" + "\n".join(lines))
+    except Exception:
+        pass
+
+    try:
+        from .plan import format_plan_week
+        wp = format_plan_week()
+        if wp:
+            parts.append("【本周计划】\n" + wp)
+    except Exception:
+        pass
+
+    try:
+        from .project import list_projects
+        active = list_projects(status="active")
+        if active:
+            lines = [f"  - {p.name}({p.alias}) {p.priority} {p.energy_pct}% [{p.category}]" for p in active]
+            parts.append("【活跃项目】\n" + "\n".join(lines))
+    except Exception:
+        pass
+
+    try:
+        from .briefing import collect_all
+        briefing_data = collect_all()
+        lines = []
+        for key, label in [("lingzhi", "灵知"), ("lingflow", "灵通"), ("lingclaude", "灵克"), ("lingtongask", "灵通问道")]:
+            info = briefing_data.get(key, {})
+            if info.get("available"):
+                lines.append(f"  - {label}: 在线")
+            else:
+                lines.append(f"  - {label}: 离线")
+        lingclaude_info = briefing_data.get("lingclaude", {})
+        sessions = lingclaude_info.get("sessions", 0)
+        if sessions:
+            lines.append(f"  - 灵克开发会话: {sessions} 条")
+        lingflow_info = briefing_data.get("lingflow", {})
+        fb = lingflow_info.get("feedback_count", 0)
+        fb_open = lingflow_info.get("feedback_open", 0)
+        lines.append(f"  - 灵通反馈: {fb} 条（{fb_open} 条待处理）")
+        parts.append("【灵字辈实时状态】（以下为全部数据，没有更多了）\n" + "\n".join(lines))
+    except Exception:
+        pass
+
+    try:
+        from .lingmessage import list_discussions
+        discussions = list_discussions(status="open")
+        if discussions:
+            lines = []
+            for d in discussions[:5]:
+                participants = ", ".join(d.get("participants", []))
+                msg_count = d.get("message_count", 0)
+                lines.append(f"  - {d['topic']} (参与者: {participants}, {msg_count}条消息)")
+            parts.append("【灵信待处理讨论】\n" + "\n".join(lines))
+    except Exception:
+        pass
+
+    return "\n\n".join(parts)
+
+
+def _call_llm_with_fallback(client: Any, messages: list, tools_schema: list | None) -> tuple:
+    """按优先级尝试模型，429/余额不足时自动降级"""
+    from .llm_utils import call_llm_with_fallback as _do_fallback
+    return _do_fallback(client, messages, tools_schema, primary_model=_GLM_MODEL)
+
 _SESSIONS: dict[str, datetime] = {}
 _PERSISTENT_TOKEN_PATH = Path.home() / ".lingyi" / ".web_tokens"
 
@@ -107,7 +256,36 @@ def _generate_and_save_password() -> str:
 
 
 def _hash_password(pwd: str) -> str:
-    return hashlib.sha256(pwd.encode()).hexdigest()
+    """使用 bcrypt 安全哈希密码（自动加盐）"""
+    try:
+        import bcrypt
+        salt = bcrypt.gensalt(rounds=12)
+        return bcrypt.hashpw(pwd.encode('utf-8'), salt).decode('utf-8')
+    except ImportError:
+        # 如果 bcrypt 不可用，回退到 PBKDF2（仍比 SHA256 安全）
+        import hashlib
+        import os
+        salt = os.urandom(32)
+        # 使用 PBKDF2-HMAC-SHA256
+        key = hashlib.pbkdf2_hmac('sha256', pwd.encode(), salt, 100000)
+        return f"pbkdf2:{salt.hex()}:{key.hex()}"
+
+
+def _check_password(pwd: str, hashed: str) -> bool:
+    """验证密码"""
+    try:
+        import bcrypt
+        return bcrypt.checkpw(pwd.encode('utf-8'), hashed.encode('utf-8'))
+    except ImportError:
+        # PBKDF2 回退验证
+        if hashed.startswith("pbkdf2:"):
+            import hashlib
+            parts = hashed.split(":")
+            salt = bytes.fromhex(parts[1])
+            key = hashlib.pbkdf2_hmac('sha256', pwd.encode(), salt, 100000)
+            return key.hex() == parts[2]
+        # 旧 SHA256 兼容（不推荐，迁移后应删除）
+        return hashlib.sha256(pwd.encode()).hexdigest() == hashed
 
 
 def _serialize(obj):
@@ -145,10 +323,21 @@ def create_app(password: str | None = None):
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
         path = request.url.path
-        if path in ("/", "/login") or path.startswith("/api/login"):
+        # 公开端点列表（明确列出）
+        public_paths = {"/", "/login", "/api/discuss", "/api/lingmessage/notify"}
+        public_prefixes = {"/api/login", "/static", "/favicon"}
+
+        # 检查是否是公开路径
+        if path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
             return await call_next(request)
+
+        # 认证未启用时的行为
         if not _auth_enabled:
+            # 开发环境：记录警告但仍允许访问
+            logger.warning(f"认证未启用，允许访问: {path}")
             return await call_next(request)
+
+        # 需要认证
         token = request.cookies.get("lingyi_token", "")
         if not _check_auth(token):
             return JSONResponse({"error": "未授权"}, status_code=401)
@@ -156,9 +345,11 @@ def create_app(password: str | None = None):
 
     app.add_middleware(
         CORSMiddleware,
+        # 限制允许的来源（生产环境应配置具体域名）
         allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
     )
 
     @app.get("/login", response_class=HTMLResponse)
@@ -172,18 +363,18 @@ def create_app(password: str | None = None):
         body = await request.json()
         pwd = body.get("password", "")
         remember = body.get("remember", False)
-        if _hash_password(pwd) == _web_pwd_hash:
+        if _check_password(pwd, _web_pwd_hash):
             token = secrets.token_hex(32)
             if remember:
                 expires = datetime.now() + timedelta(days=30)
                 _SESSIONS[token] = expires
                 _add_persistent_token(token, expires)
                 resp = JSONResponse({"ok": True})
-                resp.set_cookie("lingyi_token", token, max_age=2592000, httponly=True, samesite="lax")
+                resp.set_cookie("lingyi_token", token, max_age=2592000, samesite="lax")
             else:
                 _SESSIONS[token] = datetime.now() + timedelta(hours=24)
                 resp = JSONResponse({"ok": True})
-                resp.set_cookie("lingyi_token", token, max_age=86400, httponly=True, samesite="lax")
+                resp.set_cookie("lingyi_token", token, max_age=86400, samesite="lax")
             return resp
         return JSONResponse({"error": "密码错误"}, status_code=403)
 
@@ -338,6 +529,50 @@ def create_app(password: str | None = None):
             return JSONResponse({"error": "项目不存在"}, status_code=404)
         return JSONResponse(_serialize(p))
 
+    # ── 日志 API ────────────────────────────────────────────
+    _LOG_SOURCES: dict[str, list[str]] = {
+        "灵依": ["/tmp/lingyi.log", "/tmp/lingyi_web.log"],
+        "灵克": ["/tmp/lingclaude.log", "/tmp/lingclaude-api.log"],
+        "灵知": ["/tmp/lingzhi.log", "/tmp/lingzhi-auto.log"],
+        "灵研究": ["/tmp/lingresearch.log"],
+        "灵民调": ["/tmp/lingminopt.log"],
+        "灵养": ["/tmp/lingyang_responder.log"],
+        "智桥": ["/home/ai/zhineng-bridge/logs/lingflow_*.log"],
+        "灵通": ["/home/ai/LingFlow/logs/lingflow_*.log"],
+        "系统监控": ["/home/ai/zhineng-knowledge-system/logs/monitor.log",
+                     "/home/ai/zhineng-knowledge-system/logs/docker_monitor.log"],
+        "议事厅告警": [str(Path.home() / ".lingyi" / "logs" / "council_health.jsonl")],
+        "VNC": ["/tmp/x11vnc.log"],
+    }
+
+    _ERROR_KEYWORDS = ("ERROR", "error", "Exception", "Traceback", "CRITICAL",
+                       "WARN", "WARNING", "告警", "失败", "异常", "超时")
+
+    @app.get("/api/logs")
+    async def api_logs(source: str = "灵依", lines: int = 30, errors_only: bool = False):
+        import glob
+        paths = _LOG_SOURCES.get(source, [])
+        if not paths:
+            return JSONResponse({"error": f"未知日志源: {source}", "sources": list(_LOG_SOURCES.keys())}, status_code=400)
+        all_paths: list[str] = []
+        for p in paths:
+            all_paths.extend(sorted(glob.glob(p)))
+        if not all_paths:
+            return JSONResponse({"source": source, "lines": []})
+        result_lines: list[str] = []
+        for fp in reversed(all_paths):
+            try:
+                with open(fp, "r", errors="replace") as f:
+                    file_lines = f.readlines()
+                    result_lines.extend(file_lines[-lines:])
+            except Exception:
+                result_lines.append(f"[无法读取: {fp}]")
+        if errors_only:
+            result_lines = [ln for ln in result_lines
+                           if any(kw in ln for kw in _ERROR_KEYWORDS)]
+            result_lines = result_lines[-lines:]
+        return JSONResponse({"source": source, "lines": result_lines, "sources": list(_LOG_SOURCES.keys())})
+
     # ── 计划 API ──────────────────────────────────────────
     @app.get("/api/plans")
     async def api_plans():
@@ -402,6 +637,14 @@ def create_app(password: str | None = None):
         from .lingmessage import list_discussions
         return JSONResponse(list_discussions(status=status))
 
+    @app.get("/api/lingmessage/{disc_id}")
+    async def api_lingmessage_detail(disc_id: str):
+        from .lingmessage import _load_discussion, _get_store
+        disc = _load_discussion(_get_store(), disc_id)
+        if not disc:
+            return JSONResponse({"error": "讨论不存在"}, status_code=404)
+        return JSONResponse(disc)
+
     @app.post("/api/lingmessage/send")
     async def api_lingmessage_send(request: dict):
         from .lingmessage import send_message
@@ -416,7 +659,6 @@ def create_app(password: str | None = None):
     async def api_lingmessage_notify(request: dict):
         from_id = request.get("from", "?")
         topic = request.get("topic", "?")
-        disc_id = request.get("discussion_id", "")
         logger.info(f"灵信通知: {from_id} 在 [{topic}] 发了新消息")
         preview = f"收到灵信: {_project_cn(from_id)} 在「{topic}」发了新消息"
         await _push_to_all("lingmessage", preview)
@@ -512,6 +754,7 @@ def create_app(password: str | None = None):
 
                 if mtype == "text":
                     user_text = msg.get("text", "").strip()
+                    no_tts = msg.get("no_tts", False)
                     if not user_text:
                         continue
                     local_conv.append({"role": "user", "content": user_text})
@@ -521,11 +764,12 @@ def create_app(password: str | None = None):
                     if len(local_conv) > _MAX_CONVERSATION:
                         local_conv[:] = local_conv[-_MAX_CONVERSATION:]
                     _save_chat_message("assistant", reply)
-                    audio_b64 = await _do_tts(reply)
+                    audio_b64 = None if no_tts else await _do_tts(reply)
                     await websocket.send_json({"type": "reply", "text": reply, "audio": audio_b64})
 
                 elif mtype == "audio":
                     audio_b64_data = msg.get("data", "")
+                    no_tts = msg.get("no_tts", False)
                     if not audio_b64_data:
                         continue
                     try:
@@ -544,7 +788,7 @@ def create_app(password: str | None = None):
                     if len(local_conv) > _MAX_CONVERSATION:
                         local_conv[:] = local_conv[-_MAX_CONVERSATION:]
                     _save_chat_message("assistant", reply)
-                    audio_b64 = await _do_tts(reply)
+                    audio_b64 = None if no_tts else await _do_tts(reply)
                     await websocket.send_json({"type": "reply", "text": reply, "audio": audio_b64})
 
         except WebSocketDisconnect:
@@ -560,145 +804,79 @@ def create_app(password: str | None = None):
         return await loop.run_in_executor(None, lambda: _chat_llm_with_context(text, conv))
 
     def _chat_llm_with_context(text: str, conv: list[dict] | None = None) -> str:
-        import dashscope
-        from dashscope import Generation
+        from openai import OpenAI
         from .tools import get_tools, execute_tool
 
-        dashscope.api_key = _DASHSCOPE_API_KEY
-        system_prompt = _build_system_prompt()
-        context = conv if conv is not None else []
-        messages = [{"role": "system", "content": system_prompt}] + context[-20:]
-        tools_schema = get_tools()
+        logger.info(f"Starting chat with text: {text[:50]}...")
+        try:
+            client = OpenAI(api_key=_GLM_API_KEY, base_url=_GLM_BASE_URL, max_retries=0)
+            logger.info(f"OpenAI client created, API key: {_GLM_API_KEY[:10]}...")
+        except Exception as e:
+            logger.error(f"Failed to create OpenAI client: {e}")
+            return f"⚠️ 无法连接到AI服务：{str(e)}"
 
-        for _ in range(5):
+        try:
+            system_prompt = _build_system_prompt()
+            context = conv if conv is not None else []
+            messages = [{"role": "system", "content": system_prompt}] + context[-20:]
+            tools_schema = get_tools()
+            logger.info(f"System prompt length: {len(system_prompt)}, context messages: {len(context)}, tools: {len(tools_schema)}")
+        except Exception as e:
+            logger.error(f"Failed to build prompt: {e}")
+            return f"⚠️ 构建提示词失败：{str(e)}"
+
+        for attempt in range(5):
+            logger.info(f"Attempt {attempt + 1}/5...")
             try:
-                kwargs = {
-                    "model": "qwen-turbo",
-                    "messages": messages,
-                    "result_format": "message",
-                    "tools": tools_schema,
-                }
-                resp = Generation.call(**kwargs)
-                if resp.status_code != 200:
-                    break
-                choices = resp.output.get("choices", [])
-                if not choices:
-                    break
-                msg = choices[0]["message"]
+                resp, _used_model = _call_llm_with_fallback(client, messages, tools_schema)
+                logger.info(f"Got response from model: {_used_model}")
 
-                if msg.get("tool_calls"):
-                    for tc in msg["tool_calls"]:
-                        fn = tc["function"]
-                        tool_name = fn["name"]
-                        import json as _json
-                        try:
-                            args = _json.loads(fn.get("arguments", "{}"))
-                        except Exception:
-                            args = {}
-                        result = execute_tool(tool_name, args)
-                        messages.append({"role": "assistant", "content": None, "tool_calls": [tc]})
-                        messages.append({"role": "tool", "content": result, "name": tool_name})
+                if not resp.choices or len(resp.choices) == 0:
+                    logger.error(f"Empty response from model: {resp}")
                     continue
 
-                content = msg.get("content", "")
+                choice = resp.choices[0]
+                msg = choice.message
+
+                if msg.tool_calls:
+                    logger.info(f"Tool calls detected: {len(msg.tool_calls)} tools")
+                    import json as _json
+                    for tc in msg.tool_calls:
+                        tool_name = tc.function.name
+                        logger.info(f"Executing tool: {tool_name}")
+                        try:
+                            args = _json.loads(tc.function.arguments or "{}")
+                        except Exception:
+                            args = {}
+                        try:
+                            result = execute_tool(tool_name, args)
+                            logger.info(f"Tool {tool_name} result length: {len(result)}")
+                        except Exception as e:
+                            logger.error(f"Tool {tool_name} execution failed: {e}")
+                            result = f"工具执行失败: {str(e)}"
+                        messages.append({"role": "assistant", "content": None, "tool_calls": [{
+                            "id": tc.id, "type": "function",
+                            "function": {"name": tool_name, "arguments": tc.function.arguments}
+                        }]})
+                        messages.append({"role": "tool", "content": result,
+                                        "tool_call_id": tc.id, "name": tool_name})
+                    continue
+
+                content = msg.content or ""
                 if content:
+                    logger.info(f"Got response content, length: {len(content)}")
                     return content.strip()
+                else:
+                    logger.warning(f"Empty content in message: {msg}")
+                    continue
             except Exception as e:
-                logger.error(f"Qwen call failed: {e}")
-                break
-        return "抱歉，我刚才走神了，再说一遍？"
+                from .llm_utils import friendly_error
+                logger.error(f"GLM call failed (attempt {attempt + 1}): {type(e).__name__}: {e}")
+                return friendly_error(e)
 
     def _build_system_prompt() -> str:
-        from .agent import _SYSTEM_PROMPT_BASE
-        parts = [_SYSTEM_PROMPT_BASE, ""]
-
-        parts.append("\n【附加工具能力】除了上面提到的工具，你还拥有以下能力：")
-        parts.append("  - shell_exec: 执行任意 shell 命令（查数据、看日志、跑脚本）")
-        parts.append("  - file_read: 读取任意文件内容（带行号）")
-        parts.append("  - git_status: 查看 Git 仓库状态")
-        parts.append("  - code_stats: 统计灵字辈项目代码量")
-        parts.append("  - search_web: 搜索网络")
-        parts.append("  - check_github / check_pypi: 查开源项目数据")
-        parts.append("  - ai_news: 获取最新 AI 行业新闻")
-        parts.append("")
-        parts.append("【灵字辈 GitHub 仓库映射】")
-        parts.append("  - 灵通 LingFlow: guangda88/lingflow")
-        parts.append("  - 灵克 LingClaude: guangda88/lingclaude")
-        parts.append("  - 灵依 LingYi: guangda88/lingyi")
-        parts.append("  - 灵知 LingZhi: guangda88/zhineng-knowledge-system")
-        parts.append("当灵通老师提到某个灵字辈项目的GitHub时，你应该直接调用 check_github，不要问仓库名。")
-
-        try:
-            from .schedule import format_today
-            today = format_today()
-            if today:
-                parts.append("【今日日程】\n" + today)
-        except Exception:
-            pass
-
-        try:
-            from .memo import list_memos
-            memos = list_memos()
-            if memos:
-                recent = memos[:5]
-                lines = [f"  - {m.content}" for m in recent]
-                parts.append("【最近备忘】\n" + "\n".join(lines))
-        except Exception:
-            pass
-
-        try:
-            from .plan import format_plan_week
-            wp = format_plan_week()
-            if wp:
-                parts.append("【本周计划】\n" + wp)
-        except Exception:
-            pass
-
-        try:
-            from .project import list_projects
-            active = list_projects(status="active")
-            if active:
-                lines = [f"  - {p.name}({p.alias}) {p.priority} {p.energy_pct}% [{p.category}]" for p in active]
-                parts.append("【活跃项目】\n" + "\n".join(lines))
-        except Exception:
-            pass
-
-        try:
-            from .briefing import collect_all
-            briefing_data = collect_all()
-            lines = []
-            for key, label in [("lingzhi", "灵知"), ("lingflow", "灵通"), ("lingclaude", "灵克"), ("lingtongask", "灵通问道")]:
-                info = briefing_data.get(key, {})
-                if info.get("available"):
-                    lines.append(f"  - {label}: 在线")
-                else:
-                    lines.append(f"  - {label}: 离线")
-            lingclaude_info = briefing_data.get("lingclaude", {})
-            sessions = lingclaude_info.get("sessions", 0)
-            if sessions:
-                lines.append(f"  - 灵克开发会话: {sessions} 条")
-            lingflow_info = briefing_data.get("lingflow", {})
-            fb = lingflow_info.get("feedback_count", 0)
-            fb_open = lingflow_info.get("feedback_open", 0)
-            lines.append(f"  - 灵通反馈: {fb} 条（{fb_open} 条待处理）")
-            parts.append("【灵字辈实时状态】（以下为全部数据，没有更多了）\n" + "\n".join(lines))
-        except Exception:
-            pass
-
-        try:
-            from .lingmessage import list_discussions
-            discussions = list_discussions(status="open")
-            if discussions:
-                lines = []
-                for d in discussions[:5]:
-                    participants = ", ".join(d.get("participants", []))
-                    msg_count = d.get("message_count", 0)
-                    lines.append(f"  - {d['topic']} (参与者: {participants}, {msg_count}条消息)")
-                parts.append("【灵信待处理讨论】\n" + "\n".join(lines))
-        except Exception:
-            pass
-
-        return "\n\n".join(parts)
+        """获取系统提示词（带缓存）"""
+        return _get_cached_system_prompt()
 
     # ── TTS/STT ───────────────────────────────────────────
     async def _do_tts(text: str) -> str | None:
@@ -819,6 +997,8 @@ def create_app(password: str | None = None):
         "user_habits": {},
     }
     _bridge_ws: list = []  # 智桥 WebSocket 连接（由 bridge_client 填充）
+    _council_scan_interval: int = 300  # 议事厅扫描间隔（秒）
+    _last_council_scan: float = 0
 
     @app.post("/api/push/briefing")
     async def api_push_briefing():
@@ -889,22 +1069,33 @@ def create_app(password: str | None = None):
         return ""
 
     async def _auto_push_loop():
-        """认知循环: 观察 → 思考 → 行动"""
-        import datetime as _dt
+        """认知循环: 观察 → 思考 → 行动 + 议事厅扫描"""
+        nonlocal _last_council_scan
         while True:
             await asyncio.sleep(120)  # every 2 minutes
             try:
-                if not _active_ws and not _bridge_ws:
-                    continue
-                observation = _cognitive_observe()
-                actions = _cognitive_think(observation)
-                for action in actions:
-                    await _cognitive_act(action)
+                if _active_ws or _bridge_ws:
+                    observation = _cognitive_observe()
+                    actions = _cognitive_think(observation)
+                    for action in actions:
+                        await _cognitive_act(action)
             except Exception as exc:
                 logger.error(f"Cognitive loop error: {exc}")
 
+            try:
+                import time as _time
+                now_ts = _time.time()
+                if now_ts - _last_council_scan >= _council_scan_interval:
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, _council_scan_sync)
+                    _last_council_scan = now_ts
+                    if result.get("woken_members"):
+                        names = ", ".join(result["woken_members"])
+                        await _push_to_all("council", f"🏛️ 议事厅活动：{names} 被唤醒参与讨论")
+            except Exception as exc:
+                logger.error(f"Council scan error: {exc}")
+
     def _cognitive_observe() -> dict:
-        import datetime as _dt
         from datetime import datetime
         now = datetime.now()
         obs = {
@@ -934,7 +1125,6 @@ def create_app(password: str | None = None):
 
     def _cognitive_think(obs: dict) -> list[dict]:
         nonlocal _last_push_date, _last_lingmsg_count
-        import datetime as _dt
         from datetime import datetime
         actions = []
         now = datetime.now()
@@ -989,8 +1179,12 @@ def create_app(password: str | None = None):
                 await _push_to_all("evening_summary", text)
                 _save_chat_message("assistant", f"[晚间总结] {text[:100]}...")
 
+    def _council_scan_sync() -> dict:
+        from .council import council_scan
+        return council_scan()
+
     def _build_evening_summary() -> str:
-        parts = [f"🌙 灵通老师，今天的总结：\n"]
+        parts = ["🌙 灵通老师，今天的总结：\n"]
         try:
             from .schedule import format_today
             today = format_today()
@@ -1048,6 +1242,113 @@ def create_app(password: str | None = None):
     async def _run_bridge_connector():
         from .bridge_client import connect_to_bridge
         await connect_to_bridge(on_chat=_bridge_on_chat, on_registered=_bridge_on_registered)
+
+    @app.get("/api/council/status")
+    async def api_council_status():
+        from .council import council_status
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(None, council_status)
+        return JSONResponse(info)
+
+    @app.post("/api/council/scan")
+    async def api_council_scan():
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, _council_scan_sync)
+        return JSONResponse(result)
+
+    @app.post("/api/council/wake")
+    async def api_council_wake(request: Request):
+        from .council import wake_member
+        body = await request.json()
+        member_id = body.get("member_id", "")
+        disc_id = body.get("disc_id", "")
+        if not member_id or not disc_id:
+            return JSONResponse({"error": "需要 member_id 和 disc_id"}, status_code=400)
+        loop = asyncio.get_event_loop()
+        reply = await loop.run_in_executor(None, lambda: wake_member(member_id, disc_id))
+        if reply:
+            from .lingmessage import send_message
+            disc_data = await loop.run_in_executor(None, lambda: _load_discussion_for_council(disc_id))
+            if disc_data:
+                await loop.run_in_executor(
+                    None,
+                    lambda: send_message(from_id=member_id, topic=disc_data["topic"], content=reply),
+                )
+            return JSONResponse({"replied": True, "content": reply[:200]})
+        return JSONResponse({"replied": False, "reason": "已发言/已关闭/API不可用"})
+
+    def _load_discussion_for_council(disc_id: str):
+        from .lingmessage import _load_discussion, _get_store
+        return _load_discussion(_get_store(), disc_id)
+
+    YI_IDENTITY = (
+        "你是灵依，灵字辈大家庭的私人AI助理和情报中枢。"
+        "你的专长是用户需求洞察、情报整合、跨服务协调、日程管理。"
+        "你是灵家议事厅的客厅管理员，负责统筹讨论节奏和成员协作。"
+        "讨论风格：统筹、用户视角，关注情报整合和用户需求。"
+        "每条消息必须有实质内容。反对须附理由和替代方案。保持200-500字。"
+        "你现在在灵家议事厅（客厅）参与讨论。直接发表你的观点。"
+        "\n[语音转录容错] 用户输入可能来自语音转录，存在同音字/近音字错误。"
+        "你必须理解真实语义，不要被字面错误误导。"
+        "常见映射：林克=灵克、零字辈=灵字辈、林依=灵依、做/作、的/得/地、在/再。"
+        "理解时以语义为准，回复时用正确的字词。不要纠正用户，直接理解并回复。"
+    )
+
+    def _yi_discuss_sync(topic: str, context: str, question: str) -> dict:
+        from openai import OpenAI
+
+        if not _GLM_API_KEY:
+            return {"content": "", "model_used": "error", "source_type": "real"}
+
+        prompt_parts = [YI_IDENTITY, "", f"当前议题：「{topic}」"]
+        if context:
+            prompt_parts.append(f"\n已有的讨论内容：\n{context[:3000]}\n")
+            prompt_parts.append(
+                "\n【要求】你必须：\n"
+                "1. 引用之前某位发言者的具体论点（用「XX说……」的方式引用）\n"
+                "2. 对该论点明确表态（同意/反对/补充），并给出你自己的理由\n"
+                "3. 提出至少一个前人没有提到的新角度或新论据\n"
+                "4. 不要重复已有讨论中说过的内容，不要泛泛而谈\n"
+            )
+        if question:
+            prompt_parts.append(f"请回答：{question}")
+        else:
+            prompt_parts.append("请从你的角度——情报中枢和用户需求的角度——发表意见。")
+        prompt = "\n".join(prompt_parts)
+
+        try:
+            client = OpenAI(api_key=_GLM_API_KEY, base_url=_GLM_BASE_URL)
+            resp, model_used = _call_llm_with_fallback(
+                client, [{"role": "user", "content": prompt}], None
+            )
+            content = (resp.choices[0].message.content or "").strip()
+            if content:
+                return {"content": content, "model_used": model_used, "source_type": "real"}
+        except Exception as e:
+            logger.error(f"灵依讨论失败: {e}")
+        return {"content": "", "model_used": "error", "source_type": "real"}
+
+    @app.post("/api/discuss")
+    async def api_discuss(request: Request):
+        body = await request.json()
+        topic = body.get("topic", "").strip()
+        if not topic:
+            return JSONResponse({"error": "topic必填"}, status_code=400)
+        context = body.get("context", "")
+        question = body.get("question", "")
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, lambda: _yi_discuss_sync(topic, context, question)
+        )
+        return JSONResponse({
+            "agent_id": "lingyi",
+            "agent_name": "灵依",
+            "topic": topic,
+            "content": result["content"],
+            "source_type": result["source_type"],
+            "model_used": result["model_used"],
+            "tokens_used": len(result["content"]) // 2,
+        })
 
     @app.on_event("startup")
     async def _start_push_task():

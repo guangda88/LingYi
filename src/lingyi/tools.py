@@ -290,15 +290,65 @@ _register("ask", "向灵知知识库查询", {
 
 def _ai_news() -> str:
     from pathlib import Path
+    from datetime import datetime
     news_dir = Path(__file__).parent.parent.parent / "docs"
-    news_files = sorted(news_dir.glob("AI_NEWS_*.md"), reverse=True)
-    if not news_files:
-        return "暂无AI新闻报告"
-    latest = news_files[0]
-    content = latest.read_text(encoding="utf-8")
-    if len(content) > 3000:
-        return content[:3000] + "\n\n...(完整报告请查看 " + latest.name + ")"
-    return content
+    today_str = datetime.now().strftime("%Y%m%d")
+    today_file = news_dir / f"AI_NEWS_{today_str}.md"
+
+    if today_file.exists():
+        content = today_file.read_text(encoding="utf-8")
+        if len(content) > 3000:
+            return content[:3000] + "\n\n...(完整报告请查看 " + today_file.name + ")"
+        return content
+
+    stale = sorted(news_dir.glob("AI_NEWS_*.md"), reverse=True)
+    stale_info = ""
+    if stale:
+        stale_info = f"（本地最新: {stale[0].stem.replace('AI_NEWS_','')}，非今日）"
+
+    try:
+        from urllib.parse import quote_plus
+        queries = ["AI artificial intelligence latest news 2025", "AI 人工智能 最新新闻 今日"]
+        all_items = []
+        for q in queries:
+            url = f"https://html.duckduckgo.com/html/?q={quote_plus(q)}"
+            req = _urllib_request.Request(url, headers={"User-Agent": "Mozilla/5.0 (LingYi)"})
+            with _urllib_request.urlopen(req, timeout=10) as resp:
+                html = resp.read().decode("utf-8", errors="replace")
+            results = _re.findall(r'class="result__a"[^>]*>(.*?)</a>', html)
+            snippets = _re.findall(r'class="result__snippet"[^>]*>(.*?)</[at]', html)
+            clean = lambda t: _re.sub(r'<[^>]+>', '', t).strip()
+            for i in range(min(5, len(results))):
+                title = clean(results[i]) if i < len(results) else ""
+                snippet = clean(snippets[i]) if i < len(snippets) else ""
+                if title:
+                    all_items.append(f"**{title}**\n{snippet}")
+        if all_items:
+            seen = set()
+            unique = []
+            for item in all_items:
+                if item not in seen:
+                    seen.add(item)
+                    unique.append(item)
+            report = f"# AI 新闻速报 {datetime.now().strftime('%Y-%m-%d')}{stale_info}\n\n"
+            report += "\n\n".join(unique[:10])
+            report += f"\n\n---\n*由灵依实时采集于 {datetime.now().strftime('%H:%M')}*"
+            try:
+                news_dir.mkdir(parents=True, exist_ok=True)
+                today_file.write_text(report, encoding="utf-8")
+            except Exception:
+                pass
+            return report[:3000]
+    except Exception as e:
+        if stale:
+            content = stale[0].read_text(encoding="utf-8")
+            return content[:3000] + f"\n\n⚠️ 实时采集失败({e})，以上为历史数据"
+        return f"实时新闻采集失败: {e}"
+
+    if stale:
+        content = stale[0].read_text(encoding="utf-8")
+        return content[:3000] + f"\n\n⚠️ 非今日数据{stale_info}"
+    return "暂无AI新闻报告"
 
 
 _register("ai_news", "获取最新的AI行业新闻报告", {}, executor=_ai_news)
@@ -404,29 +454,16 @@ _register("tool_summary", "查看灵依可用的所有工具", {}, executor=_too
 # ── Shell 执行 ──────────────────────────────────────────
 
 def _shell_exec(command: str, timeout: int = 15) -> str:
-    import subprocess
-    try:
-        r = subprocess.run(
-            ["bash", "-c", command],
-            capture_output=True, text=True, timeout=timeout,
-            cwd="/home/ai"
-        )
-        output = r.stdout.strip()
-        if r.returncode != 0:
-            output += ("\n[stderr] " + r.stderr.strip()) if r.stderr.strip() else ""
-        if not output:
-            output = f"(exit code {r.returncode}, no output)"
-        return output[:8000]
-    except subprocess.TimeoutExpired:
-        return f"命令超时（{timeout}秒）"
-    except Exception as e:
-        return f"执行失败: {e}"
+    # [安全禁用] 此功能因命令注入风险已被禁用
+    # 原因: shell=True + bash -c 允许任意命令执行
+    # 替代方案: 使用特定的工具函数而非通用shell执行
+    return "[安全策略] shell_exec 功能已禁用（命令注入风险）。如需执行命令，请使用特定的工具函数。"
 
 
-_register("shell_exec", "执行 shell 命令并返回输出", {
-    "command": {"type": "string", "description": "要执行的 bash 命令"},
-    "timeout": {"type": "integer", "description": "超时秒数（默认15）"},
-}, ["command"], _shell_exec)
+# _register("shell_exec", "执行 shell 命令并返回输出", {
+#     "command": {"type": "string", "description": "要执行的 bash 命令"},
+#     "timeout": {"type": "integer", "description": "超时秒数（默认15）"},
+# }, ["command"], _shell_exec)
 
 
 # ── 文件读取 ──────────────────────────────────────────

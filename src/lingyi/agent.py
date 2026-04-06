@@ -14,11 +14,14 @@ import logging
 import os
 import re
 import urllib.request
+from pathlib import Path
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
 _DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+
+from .llm_utils import GLM_API_KEY as _GLM_API_KEY, GLM_BASE_URL as _GLM_BASE_URL, create_client, call_llm_with_fallback, friendly_error
 
 _ToolFn = Callable[..., str]
 
@@ -503,11 +506,8 @@ def process_message(text: str, conversation: list[dict]) -> str:
 
 
 def _agent_loop(text: str, conversation: list[dict]) -> str:
-    """LLM agent loop: call qwen with tools, execute, return result."""
-    import dashscope
-    from dashscope import Generation
-
-    dashscope.api_key = _DASHSCOPE_API_KEY
+    """LLM agent loop: call GLM with tools, execute, return result."""
+    client = create_client()
 
     system_prompt = _SYSTEM_PROMPT_BASE
     messages = [{"role": "system", "content": system_prompt}] + conversation[-20:]
@@ -516,34 +516,27 @@ def _agent_loop(text: str, conversation: list[dict]) -> str:
     max_rounds = 5
     for _ in range(max_rounds):
         try:
-            resp = Generation.call(
-                model="qwen-plus",
-                messages=messages,
-                tools=_TOOLS,
-                result_format="message",
-            )
+            resp = call_llm_with_fallback(client, messages, tools=_TOOLS)
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
-            return "抱歉，暂时无法处理。"
+            return friendly_error(e)
 
-        if resp.status_code != 200:
-            logger.warning(f"Qwen call failed: {resp.status_code}")
-            return "抱歉，暂时无法处理。"
+        choice = resp.choices[0]
+        msg = choice.message
 
-        choice = resp.output.get("choices", [{}])[0]
-        assistant_msg = choice.get("message", {})
-        finish_reason = choice.get("finish_reason", "")
+        if not msg.tool_calls:
+            content = msg.content or ""
+            return content.strip() if content else "⚠️ AI服务无响应，请稍后再试。"
 
-        if finish_reason != "tool_calls":
-            content = assistant_msg.get("content", "")
-            return content.strip() if content else "嗯，我刚才走神了，你再说一遍？"
+        messages.append({"role": "assistant", "content": None,
+                         "tool_calls": [{"id": tc.id, "type": "function",
+                                         "function": {"name": tc.function.name,
+                                                       "arguments": tc.function.arguments}}
+                                        for tc in msg.tool_calls]})
 
-        messages.append(assistant_msg)
-
-        tool_calls = assistant_msg.get("tool_calls", [])
-        for tc in tool_calls:
-            fn_name = tc["function"]["name"]
-            fn_args_str = tc["function"].get("arguments", "{}")
+        for tc in msg.tool_calls:
+            fn_name = tc.function.name
+            fn_args_str = tc.function.arguments or "{}"
             try:
                 fn_args = json.loads(fn_args_str)
             except json.JSONDecodeError:
@@ -559,7 +552,7 @@ def _agent_loop(text: str, conversation: list[dict]) -> str:
             messages.append({
                 "role": "tool",
                 "content": result,
-                "tool_call_id": tc.get("id", ""),
+                "tool_call_id": tc.id,
             })
 
     return "处理轮次超限，请简化问题再试。"

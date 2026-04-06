@@ -22,14 +22,17 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .page { position:absolute; inset:0; overflow-y:auto; padding:12px 16px; display:none; -webkit-overflow-scrolling:touch; }
 .page.active { display:block; }
 
-.nav { background:var(--card); display:flex; border-top:1px solid var(--border); flex-shrink:0; padding-bottom:var(--safe-bottom); z-index:10; }
-.nav button { flex:1; background:none; border:none; color:var(--dim); font-size:11px; padding:8px 0 6px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; transition:color .2s; }
+.nav { background:var(--card); display:flex; border-top:1px solid var(--border); flex-shrink:0; padding-bottom:var(--safe-bottom); z-index:10; overflow-x:auto; }
+.nav::-webkit-scrollbar { display:none; }
+.nav button { flex:1; min-width:0; background:none; border:none; color:var(--dim); font-size:10px; padding:8px 2px 6px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; transition:color .2s; white-space:nowrap; }
 .nav button.active { color:var(--accent); }
-.nav button svg { width:22px; height:22px; }
+.nav button svg { width:20px; height:20px; }
 
 .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:10px; }
 .card-title { font-size:13px; color:var(--dim); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
 .card-title span { color:var(--accent); font-size:12px; cursor:pointer; }
+.card-clickable { cursor:pointer; transition:border-color .2s; }
+.card-clickable:hover { border-color:var(--accent); }
 
 .sched-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); }
 .sched-item:last-child { border:none; }
@@ -83,16 +86,44 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .send-btn { background:var(--accent); color:#fff; border:none; width:38px; height:38px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .send-btn svg { width:18px; height:18px; fill:#fff; }
 
+.disc-item { display:flex; flex-direction:column; gap:4px; padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+.disc-item:last-child { border:none; }
+.disc-item:hover { opacity:0.85; }
+.disc-topic { font-size:14px; font-weight:500; line-height:1.4; }
+.disc-meta { display:flex; gap:8px; font-size:11px; color:var(--dim); align-items:center; }
+.disc-badge { font-size:10px; padding:1px 6px; border-radius:8px; background:var(--card2); color:var(--accent); }
+.disc-participants { font-size:11px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.disc-detail-msg { padding:10px 0; border-bottom:1px solid var(--border); }
+.disc-detail-msg:last-child { border:none; }
+.disc-msg-header { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.disc-msg-sender { font-size:12px; font-weight:600; color:var(--accent2); }
+.disc-msg-time { font-size:10px; color:var(--dim); }
+.disc-msg-type { font-size:10px; padding:1px 5px; border-radius:6px; background:var(--card2); color:var(--dim); }
+.disc-msg-body { font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+
+.back-btn { display:inline-flex; align-items:center; gap:4px; color:var(--accent); font-size:13px; cursor:pointer; padding:6px 0; margin-bottom:8px; }
+.back-btn:hover { text-decoration:underline; }
+
+.new-disc-bar { display:flex; gap:6px; margin-bottom:12px; }
+.new-disc-bar input { flex:1; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; outline:none; }
+.new-disc-bar input:focus { border-color:var(--accent); }
+.new-disc-bar button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; white-space:nowrap; }
+
+.desktop-tabs { display:none; background:var(--card); border-bottom:1px solid var(--border); flex-shrink:0; gap:0; overflow-x:auto; }
+.desktop-tabs::-webkit-scrollbar { display:none; }
+.desktop-tabs button { background:none; border:none; border-bottom:2px solid transparent; color:var(--dim); font-size:13px; padding:10px 14px; cursor:pointer; white-space:nowrap; transition:color .2s, border-color .2s; }
+.desktop-tabs button.active { color:var(--accent); border-bottom-color:var(--accent); }
+.desktop-tabs button:hover { color:var(--text); }
+
 @media (min-width:768px) {
   .pages { display:flex; }
-  .page { position:static; flex:1; }
-  .page.active { display:block; }
-  #pgHome { display:block !important; }
-  #pgChat { display:flex; flex-direction:column; border-left:1px solid var(--border); }
+  .page { position:static; flex:1; display:none !important; }
+  .page.active { display:block !important; }
+  #pgChat.active { display:flex !important; flex-direction:column; border-left:1px solid var(--border); }
   .nav { display:none; }
   .header { display:none; }
-  .pages { padding-top:40px; }
-  .pages::before { content:'灵依 — 私人助理'; position:fixed; top:0; left:0; right:0; height:40px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; font-size:15px; color:var(--accent); font-weight:600; z-index:20; }
+  .desktop-tabs { display:flex; }
 }
 
 .add-row { display:flex; gap:6px; margin-top:8px; }
@@ -100,21 +131,56 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .add-row button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; }
 
 .empty { text-align:center; padding:20px; color:var(--dim); font-size:13px; }
+.loading { text-align:center; padding:20px; color:var(--dim); }
+
+.voice-bar { position:relative; display:flex; align-items:center; gap:4px; }
+.mic-btn { background:none; border:none; color:var(--dim); font-size:20px; cursor:pointer; padding:4px 6px; border-radius:50%; transition:all .2s; }
+.mic-btn:hover { color:var(--accent); }
+.mic-btn.recording { color:#f44; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.set-btn { background:none; border:none; color:var(--dim); font-size:18px; cursor:pointer; padding:4px 6px; }
+.set-btn:hover { color:var(--accent); }
+.settings-dropdown { display:none; position:absolute; bottom:52px; right:0; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 16px; box-shadow:0 4px 20px rgba(0,0,0,.15); z-index:100; min-width:180px; }
+.settings-dropdown.show { display:block; }
+.settings-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--text); }
+.settings-row + .settings-row { border-top:1px solid var(--border); padding-top:8px; margin-top:4px; }
+.settings-row span { display:flex; align-items:center; gap:6px; }
+.toggle { position:relative; width:40px; height:22px; background:#ccc; border-radius:11px; cursor:pointer; transition:background .2s; flex-shrink:0; }
+.toggle.on { background:var(--accent); }
+.toggle::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; }
+.toggle.on::after { transform:translateX(18px); }
 </style>
 </head>
 <body>
+
+<div id="jsError" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#ff4444;color:#fff;padding:8px 12px;font-size:12px"></div>
 
 <div class="header">
   <h1>灵依</h1>
   <span class="header-time" id="headerTime"></span>
 </div>
 
+<div class="desktop-tabs">
+  <button class="active" onclick="switchPage('Home')">首页</button>
+  <button onclick="switchPage('Council')">议事厅</button>
+  <button onclick="switchPage('Chat')">对话</button>
+  <button onclick="switchPage('Sched')">日程</button>
+  <button onclick="switchPage('Memo')">备忘</button>
+  <button onclick="switchPage('Projects')">项目</button>
+  <button onclick="switchPage('Logs')">日志</button>
+</div>
+
 <div class="pages">
   <div class="page active" id="pgHome"></div>
 
+  <div class="page" id="pgCouncil">
+    <div id="councilList"></div>
+    <div id="councilDetail" style="display:none"></div>
+  </div>
+
   <div class="page" id="pgChat">
     <div class="quick-bar">
-      <button class="qbtn" onclick="sendQuick('备忘 ')">备忘</button>
+      <button class="qbtn" onclick="sendQuick('备忘')">备忘</button>
       <button class="qbtn" onclick="sendQuick('今天安排')">今天安排</button>
       <button class="qbtn" onclick="sendQuick('本周安排')">本周安排</button>
       <button class="qbtn" onclick="sendQuick('项目状态')">项目</button>
@@ -124,54 +190,132 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
     </div>
     <div class="chat-area" id="chatArea"></div>
     <div class="input-bar">
-      <input type="text" id="chatInput" placeholder="跟灵依说..." autocomplete="off">
-      <button class="send-btn" onclick="sendText()"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+      <div class="voice-bar">
+        <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="按住说话" style="display:none">&#127908;</button>
+        <input type="text" id="chatInput" placeholder="跟灵依说..." autocomplete="off">
+        <button class="send-btn" onclick="sendText()"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+        <button class="set-btn" onclick="toggleSettings()" title="语音设置">&#9881;</button>
+        <div class="settings-dropdown" id="settingsDrop">
+          <div class="settings-row"><span>&#128264; 语音回复</span><div class="toggle on" id="togTTS" onclick="toggleSetting('tts')"></div></div>
+          <div class="settings-row"><span>&#127908; 语音输入</span><div class="toggle" id="togSTT" onclick="toggleSetting('stt')"></div></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="page" id="pgSched"></div>
+
   <div class="page" id="pgMemo"></div>
+
+  <div class="page" id="pgProjects"></div>
+
+  <div class="page" id="pgLogs">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="logSource" onchange="loadLogs()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
+      <button onclick="loadLogs()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer">刷新</button>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="logErrorsOnly" onchange="loadLogs()" style="cursor:pointer">只看错误</label>
+    </div>
+    <pre id="logContent" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:1.6;overflow:auto;max-height:calc(100vh - 180px);white-space:pre-wrap;word-break:break-all;font-family:Menlo,Monaco,Consolas,monospace;color:var(--text)"></pre>
+  </div>
 </div>
 
 <div class="nav">
   <button class="active" onclick="switchPage('Home')" id="navHome"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>首页</button>
-  <button onclick="switchPage('Sched')" id="navSched"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>日程</button>
+  <button onclick="switchPage('Council')" id="navCouncil"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>议事厅</button>
   <button onclick="switchPage('Chat')" id="navChat"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>对话</button>
+  <button onclick="switchPage('Sched')" id="navSched"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>日程</button>
   <button onclick="switchPage('Memo')" id="navMemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8v-2zm0-4h8v2H8v-2z"/></svg>备忘</button>
+  <button onclick="switchPage('Projects')" id="navProjects"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>项目</button>
+  <button onclick="switchPage('Logs')" id="navLogs"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5s-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>日志</button>
 </div>
 
 <script>
+window.onerror = function(msg, url, line, col, err) {
+  var el = document.getElementById('jsError');
+  if (el) el.style.display = 'block';
+  if (el) el.textContent = 'JS错误: ' + msg + ' (行' + line + ')';
+  console.error('JS Error:', msg, url, line, col, err);
+  return false;
+};
+
+var _ttsOn = localStorage.getItem('lingyi_tts') !== 'false';
+var _sttOn = localStorage.getItem('lingyi_stt') === 'true';
+
+function toggleSettings() {
+  document.getElementById('settingsDrop').classList.toggle('show');
+}
+function toggleSetting(key) {
+  if (key === 'tts') { _ttsOn = !_ttsOn; localStorage.setItem('lingyi_tts', _ttsOn); }
+  if (key === 'stt') { _sttOn = !_sttOn; localStorage.setItem('lingyi_stt', _sttOn); }
+  applySettings();
+}
+function applySettings() {
+  var tt = document.getElementById('togTTS');
+  var ts = document.getElementById('togSTT');
+  var mb = document.getElementById('micBtn');
+  if (tt) { tt.classList.toggle('on', _ttsOn); }
+  if (ts) { ts.classList.toggle('on', _sttOn); }
+  if (mb) { mb.style.display = _sttOn ? 'inline-block' : 'none'; }
+}
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('settingsDrop');
+  if (dd && dd.classList.contains('show') && !e.target.closest('.voice-bar')) dd.classList.remove('show');
+});
+applySettings();
+
 const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
 let ws = null;
 let useBridge = false;
 let currentPage = 'Home';
+let _discussions = [];
 
 let _authToken = '';
+const _NAME_MAP = {
+  lingflow:'灵通', lingclaude:'灵克', lingzhi:'灵知',
+  lingyi:'灵依', lingtongask:'灵通问道', lingterm:'灵犀',
+  lingminopt:'灵极优', lingresearch:'灵研', zhibridge:'智桥',
+  guangda:'广大老师',
+};
+function memberName(id) { return _NAME_MAP[id] || id; }
 
 function getCookie(name) {
-  var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\/+^])/g, '\$1') + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : '';
+  try {
+    var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\/+^])/g, '\\$1') + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  } catch(e) { return ''; }
 }
 
 async function authFetch(url, opts) {
   opts = opts || {};
-  var r = await fetch(url, opts);
-  if (r.status === 401) { location.href = '/login'; return null; }
-  return r;
+  try {
+    var r = await fetch(url, opts);
+    if (r.status === 401) { location.href = '/login'; return null; }
+    return r;
+  } catch(e) {
+    console.error('authFetch error:', url, e);
+    return null;
+  }
 }
 
 // ── Navigation ──────────────────────────────────────────
 function switchPage(name) {
   currentPage = name;
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-  const pg = document.getElementById('pg' + name);
-  const nav = document.getElementById('nav' + name);
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav button').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.desktop-tabs button').forEach(function(b) { b.classList.remove('active'); });
+  var pg = document.getElementById('pg' + name);
+  var nav = document.getElementById('nav' + name);
+  var dtabs = document.querySelector('.desktop-tabs');
+  var dtab = dtabs ? dtabs.querySelector('[onclick="switchPage(\'' + name + '\')"]') : null;
   if (pg) pg.classList.add('active');
   if (nav) nav.classList.add('active');
+  if (dtab) dtab.classList.add('active');
   if (name === 'Home') loadDashboard();
+  if (name === 'Council') loadCouncil();
   if (name === 'Sched') loadSchedules();
   if (name === 'Memo') loadMemos();
+  if (name === 'Projects') loadProjects();
+  if (name === 'Logs') loadLogs();
 }
 
 // ── Dashboard ───────────────────────────────────────────
@@ -185,22 +329,33 @@ async function loadDashboard() {
     const dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
     const dt = new Date(d.date);
     html += '<div style="text-align:center;padding:8px 0 12px"><div style="font-size:22px;font-weight:700">' + (dt.getMonth()+1) + '月' + dt.getDate() + '日 ' + dayNames[dt.getDay()] + '</div></div>';
-    html += '<div class="card"><div class="card-title">今日安排</div>';
+
+    // Today schedule — clickable to Sched page
+    html += '<div class="card card-clickable" onclick="switchPage(\'Sched\')"><div class="card-title">今日安排 <span>全部 &gt;</span></div>';
     if (d.today_schedules.length === 0) {
       html += '<div class="empty">今天没有安排</div>';
     } else {
       d.today_schedules.forEach(function(s) {
         const cls = s.slot === '上午' ? '' : s.slot === '下午' ? ' pm' : ' eve';
-        html += '<div class="sched-item"><span class="sched-slot' + cls + '">' + s.slot + '</span><span class="sched-desc">' + s.description + '</span></div>';
+        html += '<div class="sched-item"><span class="sched-slot' + cls + '">' + s.slot + '</span><span class="sched-desc">' + esc(s.description) + '</span></div>';
       });
     }
     html += '</div>';
+
+    // Ling family
     html += '<div class="card"><div class="card-title">灵字辈</div>';
     d.ling_family.forEach(function(l) {
-      html += '<div class="ling-row"><span class="ling-dot ' + (l.online?'on':'off') + '"></span><span class="ling-name">' + l.name + '</span><span class="ling-detail">' + l.detail + '</span></div>';
+      html += '<div class="ling-row"><span class="ling-dot ' + (l.online?'on':'off') + '"></span><span class="ling-name">' + esc(l.name) + '</span><span class="ling-detail">' + esc(l.detail) + '</span></div>';
     });
     html += '</div>';
-    html += '<div class="card"><div class="card-title">最近备忘 <span onclick="switchPage(\'Memo\')">全部 &gt;</span></div>';
+
+    // Council quick entry
+    html += '<div class="card card-clickable" onclick="switchPage(\'Council\')"><div class="card-title">议事厅 <span>进入 &gt;</span></div>';
+    html += '<div style="font-size:12px;color:var(--dim)">灵字辈家族讨论空间 — 点击进入议事厅</div>';
+    html += '</div>';
+
+    // Recent memos — clickable to Memo page
+    html += '<div class="card card-clickable" onclick="switchPage(\'Memo\')"><div class="card-title">最近备忘 <span>全部 &gt;</span></div>';
     if (d.recent_memos.length === 0) {
       html += '<div class="empty">暂无备忘</div>';
     } else {
@@ -210,15 +365,137 @@ async function loadDashboard() {
       });
     }
     html += '</div>';
-    html += '<div class="card"><div class="card-title">活跃项目</div>';
+
+    // Active projects — clickable to Projects page
+    html += '<div class="card card-clickable" onclick="switchPage(\'Projects\')"><div class="card-title">活跃项目 <span>全部 &gt;</span></div>';
     d.active_projects.forEach(function(p) {
       html += '<div class="proj-item"><span class="proj-pri ' + p.priority + '">' + p.priority + '</span><span class="proj-name">' + esc(p.name) + '</span><span class="proj-alias">' + esc(p.alias) + '</span>' + (p.energy ? '<span class="proj-energy">' + p.energy + '%</span>' : '') + '</div>';
     });
     html += '</div>';
+
     pg.innerHTML = html;
   } catch(e) {
     document.getElementById('pgHome').innerHTML = '<div class="empty">加载失败，请检查灵依服务是否运行</div>';
   }
+}
+
+// ── Council (议事厅 / 灵信讨论) ─────────────────────────
+async function loadCouncil() {
+  var listEl = document.getElementById('councilList');
+  var detailEl = document.getElementById('councilDetail');
+  listEl.style.display = '';
+  detailEl.style.display = 'none';
+
+  listEl.innerHTML = '<div class="loading">加载议事厅...</div>';
+  try {
+    var r = await authFetch('/api/lingmessage?status=open');
+    if (!r) return;
+    _discussions = await r.json();
+
+    var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h2 style="font-size:18px;font-weight:600">🏛️ 议事厅</h2>';
+    html += '<span style="font-size:12px;color:var(--dim)">' + _discussions.length + ' 个讨论</span></div>';
+
+    html += '<div class="new-disc-bar"><input type="text" id="newDiscTopic" placeholder="发起新议题..."><button onclick="newDiscussion()">发起</button></div>';
+
+    if (_discussions.length === 0) {
+      html += '<div class="empty">暂无讨论</div>';
+    } else {
+      _discussions.forEach(function(d, i) {
+        html += '<div class="disc-item" onclick="showDiscDetail(\'' + esc(d.id) + '\')">';
+        html += '<div class="disc-topic">' + esc(d.topic) + '</div>';
+        html += '<div class="disc-meta">';
+        html += '<span class="disc-badge">' + d.message_count + ' 条</span>';
+        if (d.initiator_name || d.initiator) html += '<span>' + esc(d.initiator_name || memberName(d.initiator)) + ' 发起</span>';
+        var t = d.updated_at || d.created_at || '';
+        if (t) html += '<span>' + t.slice(5,16).replace('T',' ') + '</span>';
+        html += '</div>';
+        if (d.participants && d.participants.length) {
+          html += '<div class="disc-participants">' + esc(d.participants.map(function(p){return memberName(p);}).join(' · ')) + '</div>';
+        }
+        html += '</div>';
+      });
+    }
+    listEl.innerHTML = html;
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+async function showDiscDetail(discId) {
+  var listEl = document.getElementById('councilList');
+  var detailEl = document.getElementById('councilDetail');
+  listEl.style.display = 'none';
+  detailEl.style.display = '';
+  detailEl.innerHTML = '<div class="loading">加载讨论...</div>';
+
+  try {
+    var r = await authFetch('/api/lingmessage/' + encodeURIComponent(discId));
+    if (!r) return;
+    var disc = await r.json();
+
+    var html = '<div class="back-btn" onclick="loadCouncil()">← 返回议事厅</div>';
+    html += '<h2 style="font-size:16px;font-weight:600;margin-bottom:4px;line-height:1.4">' + esc(disc.topic) + '</h2>';
+    html += '<div style="font-size:11px;color:var(--dim);margin-bottom:12px">';
+    if (disc.initiator_name || disc.initiator) html += esc(disc.initiator_name || disc.initiator) + ' 发起 · ';
+    if (disc.participants) html += esc(disc.participants.map(function(p){return memberName(p);}).join(' · '));
+    html += ' · ' + (disc.message_count || (disc.messages||[]).length) + ' 条消息';
+    html += '</div>';
+
+    var msgs = disc.messages || [];
+    msgs.forEach(function(m) {
+      html += '<div class="disc-detail-msg">';
+      html += '<div class="disc-msg-header">';
+      html += '<span class="disc-msg-sender">' + esc(m.from_name || m.sender || m.from || '') + '</span>';
+      html += '<span class="disc-msg-type">' + esc(m.source_type || m.type || '') + '</span>';
+      var mt = m.timestamp || m.created_at || m.time || '';
+      if (mt) html += '<span class="disc-msg-time">' + mt.slice(0,19).replace('T',' ') + '</span>';
+      html += '</div>';
+      html += '<div class="disc-msg-body">' + esc(m.content || m.body || m.text || '') + '</div>';
+      html += '</div>';
+    });
+
+    if (msgs.length === 0) {
+      html += '<div class="empty">暂无消息</div>';
+    }
+
+    // Reply bar
+    html += '<div class="new-disc-bar" style="margin-top:12px"><input type="text" id="discReply" placeholder="回复此讨论..."><button onclick="replyDiscussion(\'' + esc(discId) + '\',\'' + esc(disc.topic).replace(/'/g, "\\'") + '\')">发送</button></div>';
+
+    detailEl.innerHTML = html;
+    detailEl.scrollTop = detailEl.scrollHeight;
+  } catch(e) {
+    detailEl.innerHTML = '<div class="back-btn" onclick="loadCouncil()">← 返回议事厅</div><div class="empty">加载失败</div>';
+  }
+}
+
+async function newDiscussion() {
+  var inp = document.getElementById('newDiscTopic');
+  var topic = inp.value.trim();
+  if (!topic) return;
+  inp.value = '';
+  try {
+    await authFetch('/api/lingmessage/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic: topic, content: '灵依发起讨论：' + topic})
+    });
+    loadCouncil();
+  } catch(e) {}
+}
+
+async function replyDiscussion(discId, topic) {
+  var inp = document.getElementById('discReply');
+  var content = inp.value.trim();
+  if (!content) return;
+  inp.value = '';
+  try {
+    await authFetch('/api/lingmessage/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic: topic, content: content})
+    });
+    showDiscDetail(discId);
+  } catch(e) {}
 }
 
 // ── Schedules ───────────────────────────────────────────
@@ -243,7 +520,7 @@ async function loadSchedules() {
       } else {
         info.items.forEach(function(s) {
           const cls = s.slot === '上午' ? '' : s.slot === '下午' ? ' pm' : ' eve';
-          html += '<div class="sched-item"><span class="sched-slot' + cls + '">' + s.slot + '</span><span class="sched-desc">' + esc(s.desc) + '</span></div>';
+          html += '<div class="sched-item"><span class="sched-slot' + cls + '">' + s.slot + '</span><span class="sched-desc">' + esc(s.desc || s.description) + '</span></div>';
         });
       }
       html += '</div>';
@@ -292,20 +569,55 @@ async function delMemo(id) {
   loadMemos();
 }
 
+// ── Projects ────────────────────────────────────────────
+async function loadProjects() {
+  try {
+    const r = await authFetch('/api/projects');
+    if (!r) return;
+    const projects = await r.json();
+    const pg = document.getElementById('pgProjects');
+    let html = '<h2 style="font-size:18px;font-weight:600;margin-bottom:12px">项目</h2>';
+    if (projects.length === 0) {
+      html += '<div class="empty">暂无项目</div>';
+    } else {
+      html += '<div class="card">';
+      projects.forEach(function(p, i) {
+        html += '<div class="proj-item"><span class="proj-pri ' + (p.priority||'P3') + '">' + (p.priority||'P3') + '</span><span class="proj-name">' + esc(p.name) + '</span><span class="proj-alias">' + esc(p.alias||'') + '</span>' + (p.energy_pct || p.energy ? '<span class="proj-energy">' + (p.energy_pct||p.energy) + '%</span>' : '') + '</div>';
+      });
+      html += '</div>';
+    }
+    pg.innerHTML = html;
+  } catch(e) {
+    document.getElementById('pgProjects').innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
 // ── Chat WebSocket ──────────────────────────────────────
-// 页面从灵依来，直接连灵依 WebSocket（秒连）
+var _wsRetryCount = 0;
+var _wsMaxRetries = 10;
 function connectWS() {
   _authToken = getCookie('lingyi_token');
+  if (!_authToken) {
+    _wsRetryCount++;
+    if (_wsRetryCount <= _wsMaxRetries) {
+      setTimeout(connectWS, 2000);
+    }
+    return;
+  }
+  _wsRetryCount = 0;
   var directUrl = WS_PROTO + '://' + location.host + '/ws/chat?token=' + encodeURIComponent(_authToken);
   ws = new WebSocket(directUrl);
   useBridge = false;
-  ws.onopen = function() { addChatMsg('system', '灵依已上线 ✓'); };
-  ws.onclose = function() { addChatMsg('system', '连接断开，重连中...'); setTimeout(connectWS, 3000); };
+  ws.onopen = function() { _wsRetryCount = 0; addChatMsg('system', '灵依已上线 ✓'); };
+  ws.onclose = function() {
+    _wsRetryCount++;
+    if (_wsRetryCount <= 3) addChatMsg('system', '连接断开，重连中...');
+    setTimeout(connectWS, 5000);
+  };
   ws.onerror = function() {};
   ws.onmessage = onDirectMsg;
 }
 
-// 智桥协议消息处理
 function onBridgeMsg(e) {
   var msg = JSON.parse(e.data);
   if (msg.type === 'ping' || msg.type === 'pong') return;
@@ -315,7 +627,6 @@ function onBridgeMsg(e) {
   if (msg.type === 'error') { removeTyping(); addChatMsg('system', '错误: ' + msg.message); }
 }
 
-// 直连灵依消息处理
 function onDirectMsg(e) {
   var msg = JSON.parse(e.data);
   if (msg.type === 'ping') { if (ws && ws.readyState === 1) ws.send('{"type":"pong"}'); return; }
@@ -337,7 +648,7 @@ function handlePush(msg) {
 function handleReply(msg) {
   removeTyping();
   var div = addChatMsg('bot', msg.text);
-  if (msg.audio) {
+  if (_ttsOn && msg.audio) {
     var audio = document.createElement('audio');
     audio.controls = true; audio.autoplay = true;
     audio.src = 'data:audio/mp3;base64,' + msg.audio;
@@ -372,10 +683,11 @@ function sendText() {
   var text = inp.value.trim();
   if (!text || !ws || ws.readyState !== 1) return;
   addChatMsg('user', text);
+  var payload = {type:'text', text:text, no_tts: !_ttsOn};
   if (useBridge) {
     ws.send(JSON.stringify({type:'chat', target:'lingyi', text:text}));
   } else {
-    ws.send(JSON.stringify({type:'text', text:text}));
+    ws.send(JSON.stringify(payload));
   }
   showTyping();
   inp.value = '';
@@ -387,7 +699,7 @@ function sendQuick(text) {
   if (useBridge) {
     ws.send(JSON.stringify({type:'chat', target:'lingyi', text:text}));
   } else {
-    ws.send(JSON.stringify({type:'text', text:text}));
+    ws.send(JSON.stringify({type:'text', text:text, no_tts: !_ttsOn}));
   }
   showTyping();
   switchPage('Chat');
@@ -395,7 +707,61 @@ function sendQuick(text) {
 
 document.getElementById('chatInput').onkeydown = function(e) { if (e.key === 'Enter') sendText(); };
 
-function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function esc(s) { if (s === null || s === undefined) return ''; try { var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; } catch(e) { return String(s); } }
+
+var _micRecorder = null, _micChunks = [];
+function toggleMic() {
+  if (_micRecorder && _micRecorder.state === 'recording') {
+    _micRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
+    _micChunks = [];
+    _micRecorder = new MediaRecorder(stream);
+    var btn = document.getElementById('micBtn');
+    btn.classList.add('recording');
+    _micRecorder.ondataavailable = function(e) { if (e.data.size > 0) _micChunks.push(e.data); };
+    _micRecorder.onstop = function() {
+      btn.classList.remove('recording');
+      stream.getTracks().forEach(function(t){t.stop();});
+      var blob = new Blob(_micChunks, {type:'audio/webm'});
+      var reader = new FileReader();
+      reader.onload = function() {
+        var b64 = reader.result.split(',')[1];
+        if (ws && ws.readyState === 1 && b64) {
+          ws.send(JSON.stringify({type:'audio', data:b64, no_tts: !_ttsOn}));
+          showTyping();
+        }
+      };
+      reader.readAsDataURL(blob);
+    };
+    _micRecorder.start();
+  }).catch(function(err) { alert('无法访问麦克风: ' + err.message); });
+}
+
+// ── Logs ────────────────────────────────────────────────
+function loadLogs() {
+  var sel = document.getElementById('logSource');
+  var pre = document.getElementById('logContent');
+  var source = sel.value || '灵依';
+  var errOnly = document.getElementById('logErrorsOnly').checked;
+  pre.textContent = '加载中...';
+  authFetch('/api/logs?source=' + encodeURIComponent(source) + '&lines=50&errors_only=' + errOnly)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.sources && sel.options.length === 0) {
+        data.sources.forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          sel.appendChild(opt);
+        });
+        sel.value = source;
+      }
+      pre.textContent = data.lines && data.lines.length ? data.lines.join('') : '(无日志)';
+      pre.scrollTop = pre.scrollHeight;
+    })
+    .catch(function(e) { pre.textContent = '加载失败: ' + e.message; });
+}
 
 // ── Clock ───────────────────────────────────────────────
 function updateClock() {
@@ -408,8 +774,8 @@ function updateClock() {
 setInterval(updateClock, 30000); updateClock();
 
 // ── Init ────────────────────────────────────────────────
-loadDashboard();
-connectWS();
+try { loadDashboard(); } catch(e) { console.error('loadDashboard init error:', e); }
+try { connectWS(); } catch(e) { console.error('connectWS init error:', e); }
 
 </script>
 </body>
