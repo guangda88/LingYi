@@ -10,7 +10,7 @@ Environment=DASHSCOPE_API_KEY=%h/.dashscope_api_key
 Environment=GLM_CODING_PLAN_KEY=a8525e2de71343de9de7f789a278df46.O6RtuHAKChQkVN0w
 Environment=GLM_API_KEY=b10dcd0f050f4e16b2c795f4bcaa9d90.prLf6zofUgIvT3Kd
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/python3 -m lingyi.cli web --no-ssl --port 8900
+ExecStart=/usr/bin/python3 -m lingyi.cli web --port 8900
 Restart=always
 RestartSec=10
 StandardOutput=journal
