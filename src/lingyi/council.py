@@ -66,6 +66,11 @@ MEMBER_ENDPOINTS = {
         "source": "real",
         "notify_only": True,
     },
+    "lingflow": {
+        "url": "http://127.0.0.1:8100/api/v1/discuss",
+        "source": "real",
+        "notify_only": True,
+    },
 }
 
 
