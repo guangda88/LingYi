@@ -787,7 +787,9 @@ def create_app(password: str | None = None):
 
     @app.websocket("/ws/chat")
     async def ws_chat(websocket: WebSocket):
-        raw_token = websocket.query_params.get("token", "")
+        raw_token = websocket.cookies.get("lingyi_token", "")
+        if not raw_token:
+            raw_token = websocket.query_params.get("token", "")
         if _auth_enabled and not _check_auth(raw_token):
             await websocket.close(code=4001, reason="unauthorized")
             return

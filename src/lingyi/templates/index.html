@@ -627,7 +627,7 @@ function connectWS() {
     return;
   }
   _wsRetryCount = 0;
-  var directUrl = WS_PROTO + '://' + location.host + '/ws/chat?token=' + encodeURIComponent(_authToken);
+  var directUrl = WS_PROTO + '://' + location.host + '/ws/chat';
   ws = new WebSocket(directUrl);
   useBridge = false;
   ws.onopen = function() { _wsRetryCount = 0; addChatMsg('system', '灵依已上线 ✓'); };
