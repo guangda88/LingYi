@@ -357,7 +357,7 @@ def create_app(password: str | None = None):
         path = request.url.path
         # 公开端点列表（明确列出）
         public_paths = {"/", "/login"}
-        public_prefixes = {"/api/login", "/static", "/favicon", "/api/lingmessage/notify"}
+        public_prefixes = {"/api/login", "/static", "/favicon", "/api/lingmessage/notify", "/ws/"}
 
         # 检查是否是公开路径
         if path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
@@ -716,9 +716,10 @@ def create_app(password: str | None = None):
         from .lingmessage import send_message
         topic = request.get("topic", "").strip()
         content = request.get("content", "").strip()
+        from_id = request.get("from_id", "guangda").strip() or "guangda"
         if not topic or not content:
             return JSONResponse({"error": "topic和content必填"}, status_code=400)
-        msg = send_message("lingyi", topic, content)
+        msg = send_message(from_id, topic, content)
         return JSONResponse(_serialize(msg))
 
     @app.post("/api/lingmessage/notify")
@@ -739,6 +740,7 @@ def create_app(password: str | None = None):
             "lingflow": "灵通", "lingclaude": "灵克", "lingzhi": "灵知",
             "lingyi": "灵依", "lingtongask": "灵通问道", "lingterm": "灵犀",
             "lingminopt": "灵极优", "lingresearch": "灵研", "zhibridge": "智桥",
+            "lingyang": "灵扬", "guangda": "广大老师",
         }
         return _names.get(pid, pid)
 
@@ -804,7 +806,7 @@ def create_app(password: str | None = None):
         async def _keepalive():
             try:
                 while True:
-                    await asyncio.sleep(25)
+                    await asyncio.sleep(30)
                     try:
                         await websocket.send_json({"type": "ping"})
                     except Exception:
@@ -1443,4 +1445,13 @@ def run_server(host: str = "0.0.0.0", port: int = 8900, ssl: bool = True, passwo
     proto = "https" if ssl_kwargs else "http"
     import click
     click.echo(f"灵依 Web UI 启动: {proto}://{host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_level="info", timeout_keep_alive=120, ws_ping_interval=30, ws_ping_timeout=60, **ssl_kwargs)
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="warning",
+        timeout_keep_alive=120,
+        ws_ping_interval=30,
+        ws_ping_timeout=90,
+        **ssl_kwargs
+    )
