@@ -4,16 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lingyi"
-version = "0.15.0"
+version = "0.16.0"
 description = "灵依 — 私我AI助理"
 requires-python = ">=3.12"
-dependencies = ["click>=8.0", "edge-tts>=6.0", "fastapi>=0.100", "uvicorn>=0.20"]
+dependencies = ["click>=8.0", "edge-tts>=6.0", "fastapi>=0.100", "uvicorn>=0.20", "mcp>=1.0"]
 
 [project.scripts]
 lingyi = "lingyi.cli:cli"
+lingyi-mcp = "lingyi.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

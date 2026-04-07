@@ -2,15 +2,12 @@
 
 import json
 import os
-import sqlite3
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from lingyi.db import get_db
-from lingyi.models import Memo, Schedule, Project, Plan, Session
 
 
 _TEST_PRESETS = Path(__file__).parent / "test_presets.json"
@@ -444,7 +441,7 @@ class TestPlan:
         assert "重要" in text
 
     def test_format_plan_week(self, tmp_db):
-        from lingyi.plan import add_plan, format_plan_week
+        from lingyi.plan import format_plan_week
         text = format_plan_week()
         assert "没有计划" in text
 
@@ -781,7 +778,7 @@ class TestPlanBoundary:
 class TestVersion:
     def test_version_consistency(self):
         from lingyi import __version__
-        assert __version__ == "0.15.0"
+        assert __version__ == "0.16.0"
 
     def test_cli_version(self, tmp_path, monkeypatch):
         monkeypatch.setattr("lingyi.db.DB_DIR", tmp_path)
@@ -790,7 +787,7 @@ class TestVersion:
         from lingyi.cli import cli
         runner = CliRunner()
         r = runner.invoke(cli, ["--version"])
-        assert "0.15.0" in r.output
+        assert "0.16.0" in r.output
 
 
 # ── v0.5 记忆：会话 ────────────────────────────────
@@ -1014,7 +1011,6 @@ class TestTTS:
         from lingyi.tts import synthesize_to_file
         out = str(tmp_path / "test.mp3")
         result = synthesize_to_file("测试语音", out)
-        import os
         assert os.path.exists(result)
         assert os.path.getsize(result) > 0
 
@@ -1605,7 +1601,6 @@ class TestSTT:
             return real_import(name, *a, **kw)
         monkeypatch.setattr(builtins, "__import__", mock_import)
         from lingyi.stt import transcribe_file
-        import tempfile
         f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         f.write(b"fake audio")
         f.close()
@@ -1916,7 +1911,6 @@ class TestBriefingCLI:
 
 class TestDbDirect:
     def test_get_db_creates_tables(self, tmp_db):
-        from lingyi.db import get_db
         conn = get_db()
         tables = [row["name"] for row in
                   conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
@@ -1925,20 +1919,17 @@ class TestDbDirect:
             assert t in tables
 
     def test_get_db_wal_mode(self, tmp_db):
-        from lingyi.db import get_db
         conn = get_db()
         mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
         conn.close()
         assert mode == "wal"
 
     def test_get_db_row_factory(self, tmp_db):
-        from lingyi.db import get_db
         conn = get_db()
         assert conn.row_factory is not None
         conn.close()
 
     def test_schema_idempotent(self, tmp_db):
-        from lingyi.db import get_db
         conn1 = get_db()
         conn1.close()
         conn2 = get_db()

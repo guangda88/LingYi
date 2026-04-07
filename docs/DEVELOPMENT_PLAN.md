@@ -349,7 +349,28 @@ lingyi msg-reply disc_20260404021153 "同意，知识闭环是核心"
 
 ---
 
-## v0.14+ 展望
+## v0.16 MCP封装 + 系统审计 ✅ 已完成
+
+**目标**：将灵依核心能力封装为MCP工具，接入灵字辈统一工具协议；完成v0.16系统治理审计。
+
+|| 任务 | 产出 | 预计 |
+||------|------|------|
+|| 灵依MCP Server | 12→27个工具（新增15个P0核心能力） | 2h |
+|| 灵信MCP Servers | 3个独立服务器（signing 3 + annotate 3 + bus 5 = 11工具） | 2h |
+|| MCP集成测试 | 40个端到端测试，覆盖注册/Schema/调用/边界 | 2h |
+|| 系统审计 | 5维度评估（宪章/原则/测试/计划/质量），20/46分 | 1h |
+|| 修复P0 | 测试失败(18→0)、DEVELOPMENT_PLAN重复、ruff警告 | 1h |
+
+**关键产出**：
+- `mcp_server.py`: 27个MCP工具（灵记/灵览/灵排/灵视/灵划/灵查/灵项/灵报/灵巡/灵汇/灵摘/灵问 + 灵日/灵周/灵醒/灵成/灵划周/灵统/灵板/灵忆/灵回/灵搜/灵声/灵录声/灵听/灵议/灵康）
+- `mcp_lingmessage_signing.py`: 灵信签名服务（send_message/reply_to_discussion/close_discussion）
+- `mcp_lingmessage_annotate.py`: 灵信标注服务（search_messages/detect_anomalies/annotate_discussion）
+- `mcp_lingmessage_bus.py`: 灵信总线服务（list_discussions/read_discussion/init_store/list_projects/get_stats）
+- `AUDIT_v0.16.md`: 系统治理审计报告（含2项幻觉发现 H-001/H-002）
+
+---
+
+## v0.16+ 展望（MCP生态扩展）
 
 - 情报定时自动汇报（cron/daemon）
 - 灵知数据库修复后接入更多分析API
@@ -376,10 +397,9 @@ v0.12 移动  ~2h   ✅ 已完成
 v0.13 情报  ~2h   ✅ 已完成
 v0.14 灵信集成 ~4h   ✅ 已完成
 v0.15 审计  ~7h   ✅ 已完成
-v0.14 灵信  ~4h   ✅ 已完成
-v0.15 审计  ~7h   ✅ 已完成
+v0.16 MCP封装 ~8h   ✅ 已完成（27个MCP工具 + 灵信3服务器11工具 + 系统审计）
 
-合计 ~33h，按每周 8-12 小时，约三周完成 v0.3-v0.6。
+合计 ~41h，按每周 8-12 小时，约四周完成 v0.3-v0.16。
 ```
 
 每个版本：做完 → 自己用 → 发现问题 → 记到下一版本。

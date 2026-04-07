@@ -34,11 +34,11 @@ def check_project(name: str, path: str) -> dict:
 
     diff = run_git(path, "diff", "--stat")
     if diff:
-        info["changes"].append(f"未暂存修改:\n  " + diff.replace("\n", "\n  "))
+        info["changes"].append("未暂存修改:\n  " + diff.replace("\n", "\n  "))
 
     staged = run_git(path, "diff", "--cached", "--stat")
     if staged:
-        info["changes"].append(f"已暂存未提交:\n  " + staged.replace("\n", "\n  "))
+        info["changes"].append("已暂存未提交:\n  " + staged.replace("\n", "\n  "))
 
     status_short = run_git(path, "status", "--short")
     untracked = [l for l in status_short.split("\n") if l.startswith("??")]

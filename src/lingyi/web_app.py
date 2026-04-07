@@ -14,6 +14,7 @@ import os
 import secrets
 import tempfile
 import time
+import uuid
 from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime, timedelta
@@ -661,6 +662,121 @@ def create_app(password: str | None = None):
         set_pref(key, value)
         return JSONResponse({"ok": True})
 
+    # ── 会话管理 API ───────────────────────────────────────
+    @app.get("/api/sessions")
+    async def api_list_sessions():
+        """列出所有聊天会话"""
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(_DB_PATH))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT session_id, title, created_at, updated_at, message_count "
+                "FROM chat_sessions ORDER BY updated_at DESC"
+            ).fetchall()
+            conn.close()
+            sessions = [{
+                "session_id": r["session_id"],
+                "title": r["title"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "message_count": r["message_count"],
+            } for r in rows]
+            return JSONResponse({"sessions": sessions})
+        except Exception as exc:
+            logger.error(f"Failed to list sessions: {exc}")
+            return JSONResponse({"error": str(exc)}, status_code=500)
+
+    @app.post("/api/sessions")
+    async def api_create_session(request: dict):
+        """创建新会话"""
+        title = request.get("title", "新对话").strip() or "新对话"
+        session_id = str(uuid.uuid4())
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(_DB_PATH))
+            conn.execute(
+                "INSERT INTO chat_sessions (session_id, title, message_count) VALUES (?, ?, 0)",
+                (session_id, title)
+            )
+            conn.commit()
+            conn.close()
+            return JSONResponse({"session_id": session_id, "title": title})
+        except Exception as exc:
+            logger.error(f"Failed to create session: {exc}")
+            return JSONResponse({"error": str(exc)}, status_code=500)
+
+    @app.delete("/api/sessions/{session_id}")
+    async def api_delete_session(session_id: str):
+        """删除会话"""
+        if session_id == "default":
+            return JSONResponse({"error": "默认会话不能删除"}, status_code=403)
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(_DB_PATH))
+            # 删除会话的所有消息
+            conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+            # 删除会话元数据
+            conn.execute("DELETE FROM chat_sessions WHERE session_id = ?", (session_id,))
+            conn.commit()
+            conn.close()
+            return JSONResponse({"ok": True})
+        except Exception as exc:
+            logger.error(f"Failed to delete session: {exc}")
+            return JSONResponse({"error": str(exc)}, status_code=500)
+
+    @app.put("/api/sessions/{session_id}/title")
+    async def api_update_session_title(session_id: str, request: dict):
+        """更新会话标题"""
+        title = request.get("title", "").strip()
+        if not title:
+            return JSONResponse({"error": "标题不能为空"}, status_code=400)
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(_DB_PATH))
+            conn.execute(
+                "UPDATE chat_sessions SET title = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE session_id = ?",
+                (title, session_id)
+            )
+            conn.commit()
+            conn.close()
+            return JSONResponse({"ok": True, "title": title})
+        except Exception as exc:
+            logger.error(f"Failed to update session title: {exc}")
+            return JSONResponse({"error": str(exc)}, status_code=500)
+
+    @app.delete("/api/messages/{message_id}")
+    async def api_delete_message(message_id: int):
+        """删除单条消息"""
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(_DB_PATH))
+            # 获取消息所属会话
+            row = conn.execute(
+                "SELECT session_id FROM chat_messages WHERE id = ?",
+                (message_id,)
+            ).fetchone()
+            if not row:
+                conn.close()
+                return JSONResponse({"error": "消息不存在"}, status_code=404)
+
+            session_id = row[0]
+            # 删除消息
+            conn.execute("DELETE FROM chat_messages WHERE id = ?", (message_id,))
+            # 更新会话消息计数
+            conn.execute(
+                "UPDATE chat_sessions SET message_count = message_count - 1 "
+                "WHERE session_id = ? AND message_count > 0",
+                (session_id,)
+            )
+            conn.commit()
+            conn.close()
+            return JSONResponse({"ok": True})
+        except Exception as exc:
+            logger.error(f"Failed to delete message: {exc}")
+            return JSONResponse({"error": str(exc)}, status_code=500)
+
     # ── 情报 API ──────────────────────────────────────────
     @app.get("/api/briefing")
     async def api_briefing():
@@ -773,26 +889,47 @@ def create_app(password: str | None = None):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id, id)")
+        
+        # 创建会话元数据表
+        conn.execute("""CREATE TABLE IF NOT EXISTS chat_sessions (
+            session_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL DEFAULT '新对话',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            message_count INTEGER DEFAULT 0
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at)")
         conn.commit()
         conn.close()
 
-    def _load_recent_chat(limit: int = 40) -> list[dict]:
+    def _load_recent_chat(session_id: str, limit: int = 40) -> list[dict]:
         import sqlite3
         try:
             conn = sqlite3.connect(str(_DB_PATH))
             rows = conn.execute(
-                "SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT ?", (limit,)
+                "SELECT role, content, created_at FROM chat_messages WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+                (session_id, limit)
             ).fetchall()
             conn.close()
-            return [{"role": r, "content": c} for r, c in reversed(rows)]
+            return [{"role": r, "content": c, "created_at": t} for r, c, t in reversed(rows)]
         except Exception:
             return []
 
-    def _save_chat_message(role: str, content: str):
+    def _save_chat_message(session_id: str | None = None, role: str = "", content: str = ""):
+        if session_id is None:
+            session_id = "default"
         import sqlite3
         try:
             conn = sqlite3.connect(str(_DB_PATH))
-            conn.execute("INSERT INTO chat_messages (role, content) VALUES (?, ?)", (role, content))
+            conn.execute("INSERT INTO chat_messages (session_id, role, content) VALUES (?, ?, ?)", (session_id, role, content))
+            # 更新会话元数据
+            conn.execute(
+                "INSERT INTO chat_sessions (session_id, title, message_count, updated_at) "
+                "VALUES (?, '新对话', 1, CURRENT_TIMESTAMP) "
+                "ON CONFLICT(session_id) DO UPDATE SET "
+                "message_count = message_count + 1, updated_at = CURRENT_TIMESTAMP",
+                (session_id,)
+            )
             conn.commit()
             conn.close()
         except Exception as exc:
@@ -812,11 +949,20 @@ def create_app(password: str | None = None):
             return
         await websocket.accept()
 
-        local_conv: list[dict] = _load_recent_chat(20)
+        # 从查询参数获取session_id，如果没有则创建新会话
+        initial_session_id = websocket.query_params.get("session_id", "")
+        if not initial_session_id:
+            initial_session_id = str(uuid.uuid4())
+        
+        current_session_id = initial_session_id
+        local_conv: list[dict] = _load_recent_chat(current_session_id, 20)
+
+        # Send current session info to client
+        await websocket.send_json({"type": "session_joined", "session_id": current_session_id})
 
         # Send recent history to client
         if local_conv:
-            await websocket.send_json({"type": "history", "messages": local_conv[-20:]})
+            await websocket.send_json({"type": "history", "session_id": current_session_id, "messages": local_conv[-20:]})
 
         async def _keepalive():
             try:
@@ -841,18 +987,31 @@ def create_app(password: str | None = None):
                 if mtype == "ping":
                     continue
 
+                if mtype == "switch_session":
+                    # 切换会话
+                    new_session_id = msg.get("session_id", "")
+                    if new_session_id:
+                        current_session_id = new_session_id
+                        local_conv = _load_recent_chat(current_session_id, 20)
+                        await websocket.send_json({
+                            "type": "session_switched",
+                            "session_id": current_session_id,
+                            "messages": local_conv[-20:]
+                        })
+                    continue
+
                 if mtype == "text":
                     user_text = msg.get("text", "").strip()
                     no_tts = msg.get("no_tts", False)
                     if not user_text:
                         continue
                     local_conv.append({"role": "user", "content": user_text})
-                    _save_chat_message("user", user_text)
+                    _save_chat_message(current_session_id, "user", user_text)
                     reply = await _smart_reply(user_text, local_conv)
                     local_conv.append({"role": "assistant", "content": reply})
                     if len(local_conv) > _MAX_CONVERSATION:
                         local_conv[:] = local_conv[-_MAX_CONVERSATION:]
-                    _save_chat_message("assistant", reply)
+                    _save_chat_message(current_session_id, "assistant", reply)
                     audio_b64 = None if no_tts else await _do_tts(reply)
                     await websocket.send_json({"type": "reply", "text": reply, "audio": audio_b64})
 
@@ -871,12 +1030,12 @@ def create_app(password: str | None = None):
                         continue
                     await websocket.send_json({"type": "recognized", "text": recognized})
                     local_conv.append({"role": "user", "content": recognized})
-                    _save_chat_message("user", recognized)
+                    _save_chat_message(current_session_id, "user", recognized)
                     reply = await _smart_reply(recognized, local_conv)
                     local_conv.append({"role": "assistant", "content": reply})
                     if len(local_conv) > _MAX_CONVERSATION:
                         local_conv[:] = local_conv[-_MAX_CONVERSATION:]
-                    _save_chat_message("assistant", reply)
+                    _save_chat_message(current_session_id, "assistant", reply)
                     audio_b64 = None if no_tts else await _do_tts(reply)
                     await websocket.send_json({"type": "reply", "text": reply, "audio": audio_b64})
 
@@ -1308,18 +1467,18 @@ def create_app(password: str | None = None):
             from .bridge_client import bridge_push
             await bridge_push(_bridge_ws[0], text, category)
 
-    _bridge_conv: list[dict] = _load_recent_chat(20)
+    _bridge_conv: list[dict] = _load_recent_chat("default", 20)
 
     async def _bridge_on_chat(text: str, request_id: str, from_client: str, audio: str | None) -> tuple[str, str | None]:
         """处理来自智桥的用户消息。"""
         loop = asyncio.get_event_loop()
         _bridge_conv.append({"role": "user", "content": text})
-        _save_chat_message("user", text)
+        _save_chat_message("default", "user", text)
         reply = await loop.run_in_executor(None, lambda t: _chat_llm_with_context(t, _bridge_conv), text)
         _bridge_conv.append({"role": "assistant", "content": reply})
         if len(_bridge_conv) > _MAX_CONVERSATION:
             _bridge_conv[:] = _bridge_conv[-_MAX_CONVERSATION:]
-        _save_chat_message("assistant", reply)
+        _save_chat_message("default", "assistant", reply)
         audio_b64 = await _do_tts(reply)
         return reply, audio_b64
 

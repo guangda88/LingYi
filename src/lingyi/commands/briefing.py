@@ -1,11 +1,11 @@
 """情报汇报 CLI 命令。"""
 
 import click
-import json
 
 from .. import briefing as briefing_mod
+from .. import briefing_daemon as daemon_mod
 from ..tts import speak, clean_text_for_speech
-from ..trends import TrendAnalyzer, format_trend_summary
+from ..trends import TrendAnalyzer
 
 
 def register(group: click.Group):
@@ -76,3 +76,50 @@ def register(group: click.Group):
 
         if speak_flag:
             speak(clean_text_for_speech(output))
+
+
+def register_daemon(group: click.Group):
+    """注册daemon子命令。"""
+    @group.group()
+    def daemon():
+        """定时情报汇报守护进程"""
+        pass
+
+    @daemon.command("start")
+    def daemon_start():
+        """启动守护进程"""
+        success = daemon_mod.start_daemon()
+        if not success:
+            click.echo("启动失败，请检查日志")
+            raise click.ClickException("启动失败")
+
+    @daemon.command("stop")
+    def daemon_stop():
+        """停止守护进程"""
+        daemon_mod.stop_daemon()
+
+    @daemon.command("status")
+    def daemon_status():
+        """查看守护进程状态"""
+        daemon_mod.get_status()
+
+    @daemon.command("list")
+    @click.option("--limit", "limit", default=5, help="显示数量")
+    def daemon_list(limit: int):
+        """列出最近的简报"""
+        daemon_mod.list_briefings(limit)
+
+    @daemon.command("show")
+    @click.argument("date", default=None, required=False)
+    def daemon_show(date: str | None):
+        """显示指定日期的简报（默认今天）"""
+        if date is None:
+            from datetime import datetime
+            date = datetime.now().strftime("%Y-%m-%d")
+        daemon_mod.show_briefing(date)
+
+    @daemon.command("run")
+    def daemon_run():
+        """立即生成一次简报"""
+        daemon_mod.run_once()
+

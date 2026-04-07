@@ -1,0 +1,16 @@
+[Unit]
+Description=LingYi Briefing Daemon - Daily intelligence gathering
+After=network.target
+
+[Service]
+Type=simple
+User=ai
+WorkingDirectory=/home/ai/LingYi
+ExecStart=/usr/bin/python3 -m lingyi.briefing_daemon start_daemon
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/ai/.lingyi/briefing_daemon.log
+StandardError=append:/home/ai/.lingyi/briefing_daemon.log
+
+[Install]
+WantedBy=default.target

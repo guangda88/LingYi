@@ -71,20 +71,57 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .qbtn { flex-shrink:0; background:var(--card2); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:5px 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
 .qbtn:hover { border-color:var(--accent); color:var(--accent); }
 
+.session-header { display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--card); border-bottom:1px solid var(--border); flex-shrink:0; }
+.session-toggle { background:var(--card2); border:1px solid var(--border); border-radius:8px; width:36px; height:36px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.session-toggle:hover { border-color:var(--accent); }
+.session-title { flex:1; font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.session-new { background:var(--accent); color:#fff; border:none; border-radius:8px; width:32px; height:32px; font-size:20px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.session-new:hover { background:var(--accent2); }
+.session-panel { background:var(--card); border-bottom:1px solid var(--border); max-height:200px; overflow-y:auto; flex-shrink:0; }
+.session-panel::-webkit-scrollbar { width:4px; }
+.session-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+.session-list { padding:8px; }
+.session-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; cursor:pointer; transition:background .2s; }
+.session-item:hover { background:var(--card2); }
+.session-item.active { background:var(--accent); color:#fff; }
+.session-item.active .session-item-title { color:#fff; }
+.session-item.active .session-item-meta { color:rgba(255,255,255,0.7); }
+.session-item-title { flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.session-item-meta { font-size:11px; color:var(--dim); }
+.session-item-del { color:var(--dim); font-size:16px; cursor:pointer; padding:4px; }
+.session-item-del:hover { color:#ff4444; }
+.session-loading { text-align:center; padding:20px; color:var(--dim); font-size:13px; }
+
 .chat-area { flex:1; overflow-y:auto; padding:8px 16px; display:flex; flex-direction:column; gap:8px; -webkit-overflow-scrolling:touch; }
-.msg { max-width:85%; padding:8px 12px; border-radius:12px; line-height:1.5; font-size:14px; word-break:break-word; }
-.msg.user { align-self:flex-end; background:#0f3460; color:#fff; border-bottom-right-radius:4px; }
-.msg.bot { align-self:flex-start; background:var(--card2); color:var(--text); border-bottom-left-radius:4px; white-space:pre-wrap; }
+.msg-container { position:relative; max-width:85%; display:flex; flex-direction:column; }
+.msg-container.user { align-self:flex-end; }
+.msg-container.bot { align-self:flex-start; }
+.msg { padding:8px 12px; border-radius:12px; line-height:1.5; font-size:14px; word-break:break-word; }
+.msg.user { background:#0f3460; color:#fff; border-bottom-right-radius:4px; }
+.msg.bot { background:var(--card2); color:var(--text); border-bottom-left-radius:4px; white-space:pre-wrap; }
 .msg.bot audio { margin-top:6px; width:100%; height:28px; }
 .msg.system { align-self:center; background:none; color:var(--dim); font-size:12px; }
+.msg-actions { display:flex; gap:4px; opacity:0; transition:opacity .2s; }
+.msg-container:hover .msg-actions { opacity:1; }
+.msg-action-btn { background:none; border:none; color:var(--dim); font-size:14px; cursor:pointer; padding:2px 4px; border-radius:4px; transition:all .2s; }
+.msg-action-btn:hover { background:var(--card2); color:var(--text); }
+.msg-action-btn.delete:hover { color:#ff4444; }
+.msg.collapsed { max-height:60px; overflow:hidden; position:relative; }
+.msg.collapsed::after { content:''; position:absolute; bottom:0; left:0; right:0; height:30px; background:linear-gradient(transparent, var(--card2)); }
+.date-divider { text-align:center; padding:8px 0; cursor:pointer; user-select:none; transition:opacity .2s; }
+.date-divider:hover { opacity:0.7; }
+.date-divider-text { display:inline-block; background:var(--card); color:var(--dim); font-size:12px; padding:4px 12px; border-radius:12px; border:1px solid var(--border); }
+.date-divider.collapsed .date-divider-text { background:var(--accent); color:#fff; border-color:var(--accent); }
+.date-group { display:flex; flex-direction:column; gap:8px; }
+.date-group.collapsed { display:none; }
 .typing::after { content:'...'; animation:dots 1.2s steps(4,end) infinite; }
 @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
 
 .input-bar { background:var(--card); padding:8px 12px; border-top:1px solid var(--border); display:flex; gap:6px; align-items:center; flex-shrink:0; padding-bottom:calc(8px + var(--safe-bottom)); }
-.input-bar input { flex:1; padding:9px 14px; border-radius:20px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14px; outline:none; }
+.input-bar input { flex:1; padding:14px 16px; border-radius:24px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:16px; outline:none; line-height:1.5; min-height:48px; }
 .input-bar input:focus { border-color:var(--accent); }
-.send-btn { background:var(--accent); color:#fff; border:none; width:38px; height:38px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.send-btn svg { width:18px; height:18px; fill:#fff; }
+.send-btn { background:var(--accent); color:#fff; border:none; width:44px; height:44px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.send-btn svg { width:20px; height:20px; fill:#fff; }
 
 .disc-item { display:flex; flex-direction:column; gap:4px; padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer; }
 .disc-item:last-child { border:none; }
@@ -180,6 +217,16 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
   </div>
 
   <div class="page" id="pgChat">
+    <div class="session-header">
+      <button class="session-toggle" onclick="toggleSessionPanel()" title="会话管理">💬</button>
+      <div class="session-title" id="sessionTitle">新对话</div>
+      <button class="session-new" onclick="createSession()" title="新建会话">+</button>
+    </div>
+    <div class="session-panel" id="sessionPanel" style="display:none;">
+      <div class="session-list" id="sessionList">
+        <div class="session-loading">加载中...</div>
+      </div>
+    </div>
     <div class="quick-bar">
       <button class="qbtn" onclick="sendQuick('备忘')">备忘</button>
       <button class="qbtn" onclick="sendQuick('今天安排')">今天安排</button>
@@ -617,6 +664,9 @@ async function loadProjects() {
 // ── Chat WebSocket ──────────────────────────────────────
 var _wsRetryCount = 0;
 var _wsMaxRetries = 10;
+var _currentSessionId = 'default';
+var _lastMsgDate = null;
+var _currentDateGroup = null;
 function connectWS() {
   _authToken = getCookie('lingyi_token');
   if (!_authToken) {
@@ -632,10 +682,10 @@ function connectWS() {
     return;
   }
   _wsRetryCount = 0;
-  var directUrl = WS_PROTO + '://' + location.host + '/ws/chat';
+  var directUrl = WS_PROTO + '://' + location.host + '/ws/chat?session_id=' + encodeURIComponent(_currentSessionId);
   ws = new WebSocket(directUrl);
   useBridge = false;
-  ws.onopen = function() { _wsRetryCount = 0; addChatMsg('system', '灵依已上线 ✓'); };
+  ws.onopen = function() { _wsRetryCount = 0; addChatMsg('system', '灵依已连线 ✓'); };
   ws.onclose = function(ev) {
     var reason = ev.reason || '';
     if (ev.code === 4001 || reason === 'unauthorized') {
@@ -643,16 +693,16 @@ function connectWS() {
       return;
     }
     _wsRetryCount++;
-    if (_wsRetryCount <= 3) addChatMsg('system', '连接断开，重连中...（第' + _wsRetryCount + '次）');
+    if (_wsRetryCount <= 3) addChatMsg('system', '连线断开，重连中...（第' + _wsRetryCount + '次）');
     if (_wsRetryCount > _wsMaxRetries) {
-      addChatMsg('system', '❌ 无法连接服务器，请检查网络后刷新页面');
+      addChatMsg('system', '❌ 无法连线服务器，请检查网络后刷新页面');
       return;
     }
     setTimeout(connectWS, 5000);
   };
   ws.onerror = function(ev) {
     console.error('WebSocket error:', ev);
-    addChatMsg('system', '⚠️ 连接出错，正在尝试重连...');
+    addChatMsg('system', '⚠️ 连线出错，正在尝试重连...');
   };
   ws.onmessage = onDirectMsg;
 }
@@ -669,9 +719,35 @@ function onBridgeMsg(e) {
 function onDirectMsg(e) {
   var msg = JSON.parse(e.data);
   if (msg.type === 'ping') { if (ws && ws.readyState === 1) ws.send('{"type":"pong"}'); return; }
+  if (msg.type === 'session_joined') {
+    _currentSessionId = msg.session_id;
+    loadSessions();
+    return;
+  }
+  if (msg.type === 'session_switched') {
+    _currentSessionId = msg.session_id;
+    loadSessions();
+    var area = document.getElementById('chatArea');
+    area.innerHTML = '';
+    // 重置日期状态
+    _lastMsgDate = null;
+    _currentDateGroup = null;
+    // 按日期排序历史消息
+    var sortedMsgs = msg.messages.sort(function(a, b) {
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+    });
+    sortedMsgs.forEach(function(m) { addChatMsg(m.role === 'user' ? 'user' : 'bot', m.content); });
+    setTimeout(function() { area.scrollTop = area.scrollHeight; }, 100);
+    return;
+  }
   if (msg.type === 'recognized') { addChatMsg('user', msg.text); return; }
   if (msg.type === 'history') {
-    msg.messages.forEach(function(m) { addChatMsg(m.role === 'user' ? 'user' : 'bot', m.content); });
+    _lastMsgDate = null;
+    _currentDateGroup = null;
+    var sortedMsgs = msg.messages.sort(function(a, b) {
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+    });
+    sortedMsgs.forEach(function(m) { addChatMsg(m.role === 'user' ? 'user' : 'bot', m.content); });
     return;
   }
   if (msg.type === 'push') { handlePush(msg); return; }
@@ -698,12 +774,105 @@ function handleReply(msg) {
 
 function addChatMsg(role, text) {
   var area = document.getElementById('chatArea');
+  var now = new Date();
+  var currentDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+  // 如果日期变化，创建新的日期组
+  if (currentDate !== _lastMsgDate && role !== 'system') {
+    var dateDivider = document.createElement('div');
+    dateDivider.className = 'date-divider';
+    dateDivider.innerHTML = '<span class="date-divider-text">' + formatDateLabel(now) + '</span>';
+    dateDivider.onclick = function() {
+      var group = dateDivider.nextElementSibling;
+      if (group && group.classList.contains('date-group')) {
+        group.classList.toggle('collapsed');
+        dateDivider.classList.toggle('collapsed');
+      }
+    };
+    area.appendChild(dateDivider);
+
+    _currentDateGroup = document.createElement('div');
+    _currentDateGroup.className = 'date-group';
+    area.appendChild(_currentDateGroup);
+
+    _lastMsgDate = currentDate;
+  }
+
+  // 如果没有当前日期组（比如system消息），创建一个临时的
+  var targetGroup = _currentDateGroup;
+  if (!targetGroup && role !== 'system') {
+    targetGroup = document.createElement('div');
+    targetGroup.className = 'date-group';
+    area.appendChild(targetGroup);
+  }
+
+  var container = document.createElement('div');
+  container.className = 'msg-container ' + role;
+
+  var actions = document.createElement('div');
+  actions.className = 'msg-actions';
+  if (role !== 'system') {
+    var collapseBtn = document.createElement('button');
+    collapseBtn.className = 'msg-action-btn';
+    collapseBtn.innerHTML = '&#8963;';
+    collapseBtn.title = '折叠/展开';
+    collapseBtn.onclick = function() {
+      var msgDiv = container.querySelector('.msg');
+      if (msgDiv.classList.contains('collapsed')) {
+        msgDiv.classList.remove('collapsed');
+        collapseBtn.innerHTML = '&#8963;';
+      } else {
+        msgDiv.classList.add('collapsed');
+        collapseBtn.innerHTML = '&#8964;';
+      }
+    };
+    actions.appendChild(collapseBtn);
+
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'msg-action-btn delete';
+    deleteBtn.innerHTML = '&#10005;';
+    deleteBtn.title = '删除消息';
+    deleteBtn.onclick = function() {
+      if (confirm('确定要删除这条消息吗？')) {
+        container.remove();
+        area.scrollTop = area.scrollHeight;
+      }
+    };
+    actions.appendChild(deleteBtn);
+  }
+  container.appendChild(actions);
+
   var div = document.createElement('div');
   div.className = 'msg ' + role;
   div.textContent = text;
-  area.appendChild(div);
+  container.appendChild(div);
+
+  if (targetGroup) {
+    targetGroup.appendChild(container);
+  } else {
+    area.appendChild(container);
+  }
   area.scrollTop = area.scrollHeight;
   return div;
+}
+
+function formatDateLabel(date) {
+  var now = new Date();
+  var today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  var yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  var yesterdayStr = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
+
+  var dateStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+
+  if (dateStr === today) {
+    return '今天 ' + String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+  } else if (dateStr === yesterdayStr) {
+    return '昨天 ' + String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+  } else {
+    var monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    return date.getDate() + '日 ' + monthNames[date.getMonth()];
+  }
 }
 
 function showTyping() {
@@ -776,6 +945,107 @@ function toggleMic() {
     };
     _micRecorder.start();
   }).catch(function(err) { alert('无法访问麦克风: ' + err.message); });
+}
+
+// ── Session Management ───────────────────────────────────────
+function toggleSessionPanel() {
+  var panel = document.getElementById('sessionPanel');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    loadSessions();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+async function loadSessions() {
+  var listEl = document.getElementById('sessionList');
+  listEl.innerHTML = '<div class="session-loading">加载中...</div>';
+  try {
+    var r = await authFetch('/api/sessions');
+    if (!r) return;
+    var sessions = await r.json();
+    var html = '';
+    if (sessions.length === 0) {
+      html = '<div class="empty">暂无会话</div>';
+    } else {
+      sessions.forEach(function(s) {
+        var isActive = s.session_id === _currentSessionId;
+        var t = s.updated_at ? s.updated_at.slice(5,16).replace('T',' ') : '';
+        var isDefault = s.session_id === 'default';
+        html += '<div class="session-item' + (isActive?' active':'') + '" onclick="switchSession(\'' + esc(s.session_id) + '\')">';
+        html += '<span class="session-item-title">' + esc(s.title) + (isDefault?'（默认）':'') + '</span>';
+        html += '<span class="session-item-meta">' + s.message_count + ' 条</span>';
+        html += '<span class="session-item-meta">' + t + '</span>';
+        if (!isDefault) {
+          html += '<span class="session-item-del" onclick="event.stopPropagation();deleteSession(\'' + esc(s.session_id) + '\',\'' + esc(s.title).replace(/'/g, "\\'") + '\')">×</span>';
+        }
+        html += '</div>';
+      });
+    }
+    listEl.innerHTML = html;
+    updateSessionTitle();
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+async function createSession() {
+  try {
+    var r = await authFetch('/api/sessions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title: '新对话'})
+    });
+    if (!r) return;
+    var data = await r.json();
+    if (data.session_id) {
+      switchSession(data.session_id);
+    }
+  } catch(e) {
+    alert('创建会话失败: ' + e.message);
+  }
+}
+
+function switchSession(sessionId) {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({type: 'switch_session', session_id: sessionId}));
+  }
+  _currentSessionId = sessionId;
+  loadSessions();
+  document.getElementById('chatArea').innerHTML = '';
+}
+
+async function deleteSession(sessionId, title) {
+  if (sessionId === 'default') {
+    alert('默认会话无法删除');
+    return;
+  }
+  if (!confirm('确定要删除会话“' + title + '”吗？此操作不可恢复。')) {
+    return;
+  }
+  try {
+    await authFetch('/api/sessions/' + encodeURIComponent(sessionId), {method: 'DELETE'});
+    loadSessions();
+  } catch(e) {
+    alert('删除会话失败: ' + e.message);
+  }
+}
+
+function updateSessionTitle() {
+  var titleEl = document.getElementById('sessionTitle');
+  if (!titleEl) return;
+  var listEl = document.getElementById('sessionList');
+  var items = listEl.querySelectorAll('.session-item');
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].classList.contains('active')) {
+      var titleSpan = items[i].querySelector('.session-item-title');
+      if (titleSpan) {
+        titleEl.textContent = titleSpan.textContent;
+      }
+      break;
+    }
+  }
 }
 
 // ── Logs ────────────────────────────────────────────────
