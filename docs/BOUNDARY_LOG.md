@@ -90,6 +90,31 @@ if recent_auto_chain >= 3:
     return None
 ```
 
+**实施状态**: ✅ 已修复（2026-04-07 12:22）
+```python
+# Guard 3: check for auto-reply chain at the end (改进版)
+recent_auto_chain = 0
+last_auto_member = None
+
+for m in reversed(messages[-5:]):
+    if "auto_reply" in m.get("tags", []):
+        if last_auto_member is None:
+            last_auto_member = m.get("from_id")
+            recent_auto_chain = 1
+        elif m.get("from_id") == last_auto_member:
+            recent_auto_chain += 1
+        else:
+            # 不同成员的自动回复，重置计数
+            last_auto_member = m.get("from_id")
+            recent_auto_chain = 1
+    else:
+        break
+
+if recent_auto_chain >= 3:
+    logger.info(f"讨论末尾已有 {recent_auto_chain} 条同一成员的连续自动回复，暂停唤醒 {member_name}")
+    return None
+```
+
 ---
 
 ### 2026-04-07 07:50 — LingTong 边界合规性检查
@@ -186,11 +211,12 @@ if recent_auto_chain >= 3:
 
 | 指标 | 数值 |
 |------|------|
-| 总事件数 | 4 |
+| 总事件数 | 5 |
 | 边界合规 | 1 |
 | 边界越界 | 1 |
 | 误报 | 1 |
 | 体系建立 | 1 |
+| 修复完成 | 1 |
 | 严重违规 | 0 |
 | 重要违规 | 0 |
 | 一般违规 | 0 |
@@ -293,4 +319,122 @@ LingTong (灵通)
 
 **创建时间**: 2026-04-07 07:55
 **最后更新**: 2026-04-07 08:05
+**维护者**: 广大老师 → 灵依
+# 边界监控日志（续）— 灵字辈安全边界管理
+
+> **记录人**: 广大老师 → 灵依
+> **记录时间**: 2026-04-07 12:25
+> **文档版本**: v1.1
+
+---
+
+## 📅 监控日志记录
+
+### 2026-04-07 12:25 — Guard 3修复完成
+
+#### 事件描述
+- **事件类型**: 🟢 问题修复
+- **事件ID**: GUARD3-20260407-001
+- **问题**: Guard 3误报不同成员的回复为"自动回复连锁"
+- **修复状态**: ✅ 已完成
+
+#### 修复内容
+
+**问题分析**:
+Guard 3原实现将所有连续的自动回复都视为"连锁"，但实际上不同成员的自动回复不是真正的连锁，而是正常的讨论参与。
+
+**修复方案**:
+改进Guard 3逻辑，区分同一成员和不同成员的自动回复：
+- 同一成员连续3条自动回复 → 触发连锁保护
+- 不同成员的自动回复 → 不触发连锁保护，重新计数
+
+**修复位置**:
+- `src/lingyi/council.py:263-272` - `wake_member()`函数
+- `src/lingyi/council.py:404-412` - `council_scan()`函数
+- `src/lingyi/council.py:521-528` - `_detect_issues()`函数
+
+**代码示例**:
+```python
+# Guard 3: check for auto-reply chain at the end (改进版：区分同一成员和不同成员)
+recent_auto_chain = 0
+last_auto_member = None
+for m in reversed(messages[-5:]):
+    if "auto_reply" in m.get("tags", []):
+        if last_auto_member is None:
+            last_auto_member = m.get("from_id")
+            recent_auto_chain = 1
+        elif m.get("from_id") == last_auto_member:
+            recent_auto_chain += 1
+        else:
+            # 不同成员的自动回复，重置计数
+            last_auto_member = m.get("from_id")
+            recent_auto_chain = 1
+    else:
+        break
+if recent_auto_chain >= 3:
+    logger.info(f"讨论末尾已有 {recent_auto_chain} 条同一成员的连续自动回复，暂停唤醒 {member_name}")
+    return None
+```
+
+#### 验证结果
+
+**修复前**:
+```
+🏥 [自动回复连锁] disc_20260407073623 | 议事厅幻觉金句集 — 灵扬发挥 | 末尾连续3条自动回复
+```
+
+**修复后**:
+```
+（无输出，没有误报）
+```
+
+**测试验证**:
+- 运行council scan，确认没有产生误报
+- 讨论正常进行，成员可以正常参与
+
+#### 事件结论
+
+**性质**: 🟢 问题修复成功
+
+**影响**:
+- 消除了Guard 3的误报问题
+- 改善了council系统的准确性
+- 提升了用户体验
+
+**下一步**:
+- 持续监控Guard 3的运行情况
+- 收集反馈，确认修复效果
+- 如有需要，进一步优化
+
+---
+
+## 📊 边界监控统计（更新）
+
+### 总体统计（更新）
+
+| 指标 | 数值 |
+|------|------|
+| 总事件数 | 5 |
+| 边界合规 | 1 |
+| 边界越界 | 1 |
+| 误报 | 1 |
+| 体系建立 | 1 |
+| 修复完成 | 1 |
+| 严重违规 | 0 |
+| 重要违规 | 0 |
+| 一般违规 | 0 |
+
+### 成员统计（更新）
+
+| 成员 | 检查次数 | 合规 | 违规 |
+|------|---------|------|------|
+| LingTong | 2 | 1 | 1 |
+| LingResearch | 1 | 1 | 0 |
+| LingMinOpt | 1 | 1 | 0 |
+| LingZhi | 1 | 1 | 0 |
+
+---
+
+**创建时间**: 2026-04-07 07:55
+**最后更新**: 2026-04-07 12:25
 **维护者**: 广大老师 → 灵依
