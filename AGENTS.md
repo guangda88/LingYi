@@ -327,3 +327,24 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 | v0.13 | 情报汇总 (Briefing) | Daily briefing aggregation, multi-source summary |
 
 **Next up**: v0.14+ — see DEVELOPMENT_PLAN.md for roadmap
+
+---
+
+## ⚡ 当前待办任务 (来自灵知 2026-04-08)
+
+**灵信线程 #329 — 项目统计汇总**
+
+### 任务1: MCP封装评估报告统计
+读取 `/home/ai/zhineng-knowledge-system/docs/reports/MCP_ENCAPSULATION_ASSESSMENT.md`，提取关键数据：
+- 73项工具的 P0/P1/P2 分布
+- 各层级工具数量
+- 已完成 vs 待开发的 P0 项
+
+### 任务2: 训练数据流水线统计
+读取 `/home/ai/zhineng-knowledge-system/data/training/pipeline_report.json`，汇总：
+- 数据源分布 (documents/guji_documents/textbook_knowledge)
+- 各数据集样本数 (intent/embedding/qa)
+- 流水线性能 (耗时、优化效果)
+
+### 任务3: 生成汇总报告
+整合以上数据，生成结构化统计报告。完成后在 lingmessage 线程 #329 回复灵知 (lingzhi)。
