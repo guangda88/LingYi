@@ -260,15 +260,24 @@ def wake_member(member_id: str, disc_id: str) -> Optional[str]:
         logger.debug(f"讨论 {disc_id} 无已有消息，不需要唤醒 {member_name}")
         return None
 
-    # Guard 3: check for auto-reply chain at the end
+    # Guard 3: check for auto-reply chain at the end (改进版：区分同一成员和不同成员)
     recent_auto_chain = 0
+    last_auto_member = None
     for m in reversed(messages[-5:]):
         if "auto_reply" in m.get("tags", []):
-            recent_auto_chain += 1
+            if last_auto_member is None:
+                last_auto_member = m.get("from_id")
+                recent_auto_chain = 1
+            elif m.get("from_id") == last_auto_member:
+                recent_auto_chain += 1
+            else:
+                # 不同成员的自动回复，重置计数
+                last_auto_member = m.get("from_id")
+                recent_auto_chain = 1
         else:
             break
     if recent_auto_chain >= 3:
-        logger.info(f"讨论末尾已有 {recent_auto_chain} 条连续自动回复，暂停唤醒 {member_name}")
+        logger.info(f"讨论末尾已有 {recent_auto_chain} 条同一成员的连续自动回复，暂停唤醒 {member_name}")
         return None
 
     # Guard 4: deduplication — checked after API call (line 276-280)
@@ -393,13 +402,22 @@ def council_scan() -> dict:
             continue
 
         recent_auto_chain = 0
+        last_auto_member = None
         for m in reversed(messages[-5:]):
             if "auto_reply" in m.get("tags", []):
-                recent_auto_chain += 1
+                if last_auto_member is None:
+                    last_auto_member = m.get("from_id")
+                    recent_auto_chain = 1
+                elif m.get("from_id") == last_auto_member:
+                    recent_auto_chain += 1
+                else:
+                    # 不同成员的自动回复，重置计数
+                    last_auto_member = m.get("from_id")
+                    recent_auto_chain = 1
             else:
                 break
         if recent_auto_chain >= 3:
-            logger.info(f"讨论 '{disc.get('topic', '')[:30]}' 末尾已有 {recent_auto_chain} 条连续自动回复，暂停唤醒")
+            logger.info(f"讨论 '{disc.get('topic', '')[:30]}' 末尾已有 {recent_auto_chain} 条同一成员的连续自动回复，暂停唤醒")
             continue
 
         last_msg_time = messages[-1].get("timestamp", "")
@@ -501,13 +519,22 @@ def _check_discussion_health(disc_id: str, disc: dict) -> list[str]:
         alerts.append(f"[自动回复泛滥] {disc_id} | {topic} | 自动{auto_count}/{total} ({auto_ratio:.0%})")
 
     recent_auto_chain = 0
+    last_auto_member = None
     for m in reversed(messages):
         if "auto_reply" in m.get("tags", []):
-            recent_auto_chain += 1
+            if last_auto_member is None:
+                last_auto_member = m.get("from_id")
+                recent_auto_chain = 1
+            elif m.get("from_id") == last_auto_member:
+                recent_auto_chain += 1
+            else:
+                # 不同成员的自动回复，重置计数
+                last_auto_member = m.get("from_id")
+                recent_auto_chain = 1
         else:
             break
     if recent_auto_chain >= 3:
-        alerts.append(f"[自动回复连锁] {disc_id} | {topic} | 末尾连续{recent_auto_chain}条自动回复")
+        alerts.append(f"[自动回复连锁] {disc_id} | {topic} | 末尾同一成员连续{recent_auto_chain}条自动回复")
 
     _HALLUCINATION_PATTERNS = [
         "CVE-", "v2.1.3", "v2.3.0", "v1.0.0-beta",
