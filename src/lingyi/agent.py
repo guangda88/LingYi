@@ -506,6 +506,16 @@ def process_message(text: str, conversation: list[dict]) -> str:
     return _agent_loop(text, conversation)
 
 
+def _extract_text_from_messages(messages: list[dict]) -> str:
+    """Extract the best text content from conversation messages for partial results."""
+    for msg in reversed(messages):
+        content = msg.get("content")
+        role = msg.get("role", "")
+        if content and role == "assistant":
+            return content.strip()
+    return ""
+
+
 def _agent_loop(text: str, conversation: list[dict]) -> str:
     """LLM agent loop: call GLM with tools, execute, return result."""
     client = create_client()
@@ -514,12 +524,16 @@ def _agent_loop(text: str, conversation: list[dict]) -> str:
     messages = [{"role": "system", "content": system_prompt}] + conversation[-20:]
     messages.append({"role": "user", "content": text})
 
-    max_rounds = 5
-    for _ in range(max_rounds):
+    max_rounds = 10
+    for round_idx in range(max_rounds):
         try:
             resp, _model_used = call_llm_with_fallback(client, messages, tools=_TOOLS)
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
+            logger.error(f"LLM call failed (round {round_idx + 1}): {e}")
+            if round_idx >= 2:
+                _partial = _extract_text_from_messages(messages)
+                if _partial:
+                    return _partial + "\n\n⚠️ 部分结果（LLM调用中途失败）"
             return friendly_error(e)
 
         choice = resp.choices[0]
@@ -556,4 +570,7 @@ def _agent_loop(text: str, conversation: list[dict]) -> str:
                 "tool_call_id": tc.id,
             })
 
-    return "处理轮次超限，请简化问题再试。"
+    _partial = _extract_text_from_messages(messages)
+    if _partial:
+        return _partial + "\n\n⚠️ 处理轮次较多，以上是已收集的结果。"
+    return "处理轮次超限，请稍后再试。"

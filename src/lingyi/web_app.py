@@ -980,7 +980,11 @@ def create_app(password: str | None = None):
         ka_task = asyncio.create_task(_keepalive())
         try:
             while True:
-                raw = await websocket.receive_text()
+                try:
+                    raw = await asyncio.wait_for(websocket.receive_text(), timeout=300)
+                except asyncio.TimeoutError:
+                    logger.info("WebSocket receive timed out after 300s")
+                    break
                 msg = json.loads(raw)
                 mtype = msg.get("type", "text")
 
@@ -1049,7 +1053,14 @@ def create_app(password: str | None = None):
 
     async def _smart_reply(text: str, conv: list[dict] | None = None) -> str:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, lambda: _chat_llm_with_context(text, conv))
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: _chat_llm_with_context(text, conv)),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("_smart_reply timed out after 60s")
+            return "⚠️ AI 响应超时，请稍后再试。"
 
     def _chat_llm_with_context(text: str, conv: list[dict] | None = None) -> str:
         from openai import OpenAI
@@ -1072,6 +1083,7 @@ def create_app(password: str | None = None):
             logger.error(f"Failed to build prompt: {e}")
             return f"⚠️ 构建提示词失败：{str(e)}"
 
+        _err_count = 0
         for attempt in range(5):
             logger.info(f"Attempt {attempt + 1}/5...")
             try:
@@ -1117,9 +1129,13 @@ def create_app(password: str | None = None):
                     logger.warning(f"Empty content in message: {msg}")
                     continue
             except Exception as e:
-                from .llm_utils import friendly_error
-                logger.error(f"GLM call failed (attempt {attempt + 1}): {type(e).__name__}: {e}")
-                return friendly_error(e)
+                _err_count += 1
+                logger.error(f"GLM call failed (attempt {attempt + 1}, error {_err_count}): {type(e).__name__}: {e}")
+                if _err_count >= 3:
+                    from .llm_utils import friendly_error
+                    return friendly_error(e)
+                time.sleep(2 * _err_count)
+                continue
 
     def _build_system_prompt() -> str:
         """获取系统提示词（带缓存）"""
