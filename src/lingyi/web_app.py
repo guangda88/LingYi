@@ -52,7 +52,7 @@ if not _GLM_API_KEY:
         elif _kf.exists():
             _GLM_API_KEY = _kf.read_text(encoding="utf-8").strip()
             break
-_GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+_GLM_BASE_URL = os.environ.get("GLM_BASE_URL", "https://open.bigmodel.cn/api/coding/paas/v4")
 _GLM_MODEL = os.environ.get("GLM_MODEL", "glm-5.1")
 
 # 系统提示词缓存（5分钟过期）
@@ -125,7 +125,7 @@ def _build_system_prompt_impl(base_prompt: str) -> str:
         from .project import list_projects
         active = list_projects(status="active")
         if active:
-            lines = [f"  - {p.name}({p.alias}) {p.priority} {p.energy_pct}% [{p.category}]" for p in active]
+            lines = [f"  - {p.name}({p.alias}) {p.priority} [{p.category}]" for p in active]
             parts.append("【活跃项目】\n" + "\n".join(lines))
     except Exception:
         pass
@@ -491,7 +491,7 @@ def create_app(password: str | None = None):
                 {
                     "id": p.id, "name": p.name, "alias": p.alias,
                     "priority": p.priority, "category": p.category,
-                    "energy": p.energy_pct, "status": p.status,
+                    "description": p.description, "status": p.status,
                 }
                 for p in projects[:8]
             ],
@@ -576,6 +576,85 @@ def create_app(password: str | None = None):
         from .project import list_projects
         items = list_projects(status=status)
         return JSONResponse([_serialize(p) for p in items])
+
+    def _git_info(repo_name: str) -> dict:
+        import subprocess as _sp
+        home = Path.home()
+        candidates = [home / repo_name, home / "lingtongask" / repo_name, home / "LingYi" / repo_name]
+        repo_dir = next((c for c in candidates if (c / ".git").is_dir()), None)
+        if not repo_dir:
+            return {"repo_found": False}
+        try:
+            def _git(*args: str) -> str:
+                return _sp.run(["git", "-C", str(repo_dir)] + list(args),
+                               capture_output=True, text=True, timeout=5).stdout.strip()
+
+            branch = _git("branch", "--show-current")
+            last_hash = _git("log", "-1", "--format=%H")
+            last_msg = _git("log", "-1", "--format=%s")[:80]
+            last_time = _git("log", "-1", "--format=%ar")
+            last_iso = _git("log", "-1", "--format=%aI")
+            tag = _git("describe", "--tags", "--abbrev=0") or ""
+            dirty_raw = _git("status", "--porcelain")
+            dirty = len([l for l in dirty_raw.split("\n") if l.strip()])
+            week_commits_raw = _git("log", "--oneline", "--since=7 days ago")
+            week_commits = len([l for l in week_commits_raw.split("\n") if l.strip()])
+
+            return {
+                "repo_found": True, "repo_path": str(repo_dir), "branch": branch,
+                "last_commit": last_msg, "last_commit_time": last_time,
+                "last_commit_iso": last_iso, "tag": tag, "dirty_files": dirty,
+                "week_commits": week_commits,
+            }
+        except Exception:
+            return {"repo_found": True, "repo_path": str(repo_dir)}
+
+    @app.get("/api/projects/live")
+    async def api_projects_live():
+        import subprocess as _sp
+        from .project import list_projects
+        items = list_projects()
+
+        try:
+            from .lingmessage import list_discussions as _list_disc
+            threads = _list_disc()
+        except Exception:
+            threads = []
+
+        _PROJECT_ALIASES = {
+            "LingFlow": ["lingflow", "灵通"], "LingClaude": ["lingclaude", "灵克"],
+            "灵知系统": ["lingzhi", "灵知"], "LingYi": ["lingyi", "灵依"],
+            "lingtongask": ["lingtongask", "灵通问道"], "Ling-term-mcp": ["lingterm", "灵犀"],
+            "LingMinOpt": ["lingminopt", "灵极优"], "zhineng-bridge": ["zhibridge", "智桥"],
+            "lingresearch": ["lingresearch", "灵研"],
+            "zhineng-knowledge-system": ["lingzhi", "灵知"],
+        }
+
+        results = []
+        for p in items:
+            d = _serialize(p)
+            d["git"] = _git_info(p.repo)
+            if d["git"].get("tag"):
+                d["version"] = d["git"]["tag"]
+
+            aliases = _PROJECT_ALIASES.get(p.name, [p.name.lower(), p.alias])
+            related = []
+            for t in threads:
+                topic = t.get("topic", "")
+                tags = t.get("tags", [])
+                text = (topic + " " + " ".join(tags)).lower()
+                if any(a.lower() in text for a in aliases):
+                    related.append({
+                        "id": t.get("id") or t.get("thread_id", ""),
+                        "topic": topic[:60],
+                        "messages": t.get("message_count", 0),
+                        "updated": t.get("updated_at", ""),
+                    })
+            related.sort(key=lambda x: x.get("updated", ""), reverse=True)
+            d["discussions"] = related[:3]
+            results.append(d)
+
+        return JSONResponse(results)
 
     @app.get("/api/projects/{name}")
     async def api_project_detail(name: str):

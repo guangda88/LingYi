@@ -38,7 +38,6 @@ class Project:
     description: str = ""
     repo: str = ""
     version: str = ""
-    energy_pct: int = 0
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""

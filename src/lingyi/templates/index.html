@@ -64,7 +64,29 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .proj-pri.P3 { background:#555; color:#ccc; }
 .proj-name { font-size:13px; flex:1; }
 .proj-alias { font-size:12px; color:var(--dim); }
-.proj-energy { font-size:11px; color:var(--green); }
+.live-card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:10px; border:1px solid var(--border); }
+.live-card:hover { border-color:var(--accent); }
+.live-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.live-name { font-size:15px; font-weight:600; }
+.live-alias { font-size:12px; color:var(--dim); }
+.live-tag { font-size:10px; padding:2px 6px; border-radius:8px; font-weight:600; }
+.live-tag.active { background:#22c55e22; color:#22c55e; }
+.live-tag.maintenance { background:#f59e0b22; color:#f59e0b; }
+.live-tag.paused { background:#6b728022; color:#9ca3af; }
+.live-tag.archived { background:#37415122; color:#6b7280; }
+.live-desc { font-size:12px; color:var(--dim); margin-bottom:8px; }
+.live-git { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11px; color:var(--dim); margin-bottom:6px; }
+.live-git b { color:var(--text); font-weight:500; }
+.live-commit { font-size:11px; color:var(--dim); background:var(--card2); border-radius:6px; padding:4px 8px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.live-dots { display:flex; gap:2px; }
+.live-dot { width:6px; height:6px; border-radius:50%; }
+.live-dot.on { background:#22c55e; }
+.live-dot.off { background:#374151; }
+.live-disc { font-size:11px; color:var(--dim); }
+.live-disc span { margin-right:10px; }
+.live-section { font-size:13px; font-weight:600; margin:16px 0 8px 0; padding-bottom:4px; border-bottom:1px solid var(--border); }
+.live-section .count { font-weight:400; color:var(--dim); font-size:11px; margin-left:4px; }
+.live-dirty { color:#f59e0b; font-size:10px; margin-left:4px; }
 
 .quick-bar { display:flex; gap:6px; padding:6px 0; overflow-x:auto; flex-shrink:0; }
 .quick-bar::-webkit-scrollbar { display:none; }
@@ -91,6 +113,13 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .session-item-del { color:var(--dim); font-size:16px; cursor:pointer; padding:4px; }
 .session-item-del:hover { color:#ff4444; }
 .session-loading { text-align:center; padding:20px; color:var(--dim); font-size:13px; }
+.session-date-group { margin-top:4px; }
+.session-date-label { font-size:11px; color:var(--dim); padding:4px 10px 2px; display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
+.session-date-label:hover { color:var(--text); }
+.session-date-label .arrow { transition:transform .2s; font-size:10px; }
+.session-date-label .arrow.collapsed { transform:rotate(-90deg); }
+.session-date-items { overflow:hidden; transition:max-height .25s ease; }
+.session-date-items.collapsed { max-height:0 !important; }
 
 .chat-area { flex:1; overflow-y:auto; padding:8px 16px; display:flex; flex-direction:column; gap:8px; -webkit-overflow-scrolling:touch; }
 .msg-container { position:relative; max-width:85%; display:flex; flex-direction:column; }
@@ -186,6 +215,22 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 .toggle.on { background:var(--accent); }
 .toggle::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; }
 .toggle.on::after { transform:translateX(18px); }
+
+.mail-item { display:flex; flex-direction:column; gap:4px; padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+.mail-item:last-child { border:none; }
+.mail-item:hover { opacity:0.85; }
+.mail-from { font-size:13px; font-weight:600; color:var(--accent2); }
+.mail-topic { font-size:14px; font-weight:500; line-height:1.4; }
+.mail-preview { font-size:12px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mail-time { font-size:11px; color:var(--dim); }
+.mail-meta { display:flex; gap:8px; font-size:11px; color:var(--dim); align-items:center; }
+.mail-compose-bar { display:flex; flex-direction:column; gap:8px; }
+.mail-compose-bar input, .mail-compose-bar textarea { width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; outline:none; font-family:inherit; }
+.mail-compose-bar input:focus, .mail-compose-bar textarea:focus { border-color:var(--accent); }
+.mail-compose-bar textarea { min-height:120px; resize:vertical; }
+.mail-compose-actions { display:flex; gap:8px; justify-content:flex-end; }
+.mail-compose-actions button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:13px; cursor:pointer; }
+.mail-compose-actions button.secondary { background:var(--card2); color:var(--text); border:1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -205,6 +250,7 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
   <button onclick="switchPage('Memo')">备忘</button>
   <button onclick="switchPage('Projects')">项目</button>
   <button onclick="switchPage('Logs')">日志</button>
+  <button onclick="switchPage('Mail')">灵信</button>
   <button onclick="switchPage('Models')">模型</button>
 </div>
 
@@ -223,6 +269,9 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
       <button class="session-new" onclick="createSession()" title="新建会话">+</button>
     </div>
     <div class="session-panel" id="sessionPanel" style="display:none;">
+      <div style="display:flex;justify-content:flex-end;padding:4px 8px;border-bottom:1px solid var(--border)">
+        <button onclick="cleanupSessions()" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--dim);font-size:11px;cursor:pointer">清理空会话</button>
+      </div>
       <div class="session-list" id="sessionList">
         <div class="session-loading">加载中...</div>
       </div>
@@ -257,6 +306,12 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
 
   <div class="page" id="pgProjects"></div>
 
+  <div class="page" id="pgMail">
+    <div id="mailList"></div>
+    <div id="mailDetail" style="display:none"></div>
+    <div id="mailCompose" style="display:none"></div>
+  </div>
+
   <div class="page" id="pgLogs">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <select id="logSource" onchange="loadLogs()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
@@ -270,7 +325,7 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       <div style="font-size:18px;font-weight:700">模型状态</div>
       <button onclick="loadModels()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer">刷新</button>
-      <button onclick="probeModels()" id="probeBtn" style="padding:6px 12px;border-radius:8px;border:none;background:#6c5ce7;color:#fff;font-size:13px;cursor:pointer">探测高级模型</button>
+      <button onclick="probeModels()" id="probeBtn" style="padding:6px 12px;border-radius:8px;border:none;background:#6c5ce7;color:#fff;font-size:13px;cursor:pointer">探测全部模型</button>
     </div>
     <div id="modelResetBanner" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
     <div id="modelCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px"></div>
@@ -294,6 +349,7 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
   <button onclick="switchPage('Memo')" id="navMemo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8v-2zm0-4h8v2H8v-2z"/></svg>备忘</button>
   <button onclick="switchPage('Projects')" id="navProjects"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>项目</button>
   <button onclick="switchPage('Logs')" id="navLogs"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5s-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>日志</button>
+  <button onclick="switchPage('Mail')" id="navMail"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>灵信</button>
   <button onclick="switchPage('Models')" id="navModels"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.11 0-12.58 3.51-3.47 9.14-3.49 12.65-.06L21 3v7.12z"/></svg>模型</button>
 </div>
 
@@ -385,6 +441,7 @@ function switchPage(name) {
   if (name === 'Projects') loadProjects();
   if (name === 'Logs') loadLogs();
   if (name === 'Models') loadModels();
+  if (name === 'Mail') loadMail();
 }
 
 // ── Dashboard ───────────────────────────────────────────
@@ -438,7 +495,7 @@ async function loadDashboard() {
     // Active projects — clickable to Projects page
     html += '<div class="card card-clickable" onclick="switchPage(\'Projects\')"><div class="card-title">活跃项目 <span>全部 &gt;</span></div>';
     d.active_projects.forEach(function(p) {
-      html += '<div class="proj-item"><span class="proj-pri ' + p.priority + '">' + p.priority + '</span><span class="proj-name">' + esc(p.name) + '</span><span class="proj-alias">' + esc(p.alias) + '</span>' + (p.energy ? '<span class="proj-energy">' + p.energy + '%</span>' : '') + '</div>';
+      html += '<div class="proj-item"><span class="proj-pri ' + p.priority + '">' + p.priority + '</span><span class="proj-name">' + esc(p.name) + '</span><span class="proj-alias">' + esc(p.alias) + '</span><span style="font-size:11px;color:var(--dim)">' + esc(p.description||'') + '</span></div>';
     });
     html += '</div>';
 
@@ -567,6 +624,160 @@ async function replyDiscussion(discId, topic) {
   } catch(e) {}
 }
 
+// ── Mail (灵信邮箱) ──────────────────────────────────────
+var _mailList = [];
+async function loadMail() {
+  var listEl = document.getElementById('mailList');
+  var detailEl = document.getElementById('mailDetail');
+  var composeEl = document.getElementById('mailCompose');
+  listEl.style.display = '';
+  detailEl.style.display = 'none';
+  composeEl.style.display = 'none';
+
+  listEl.innerHTML = '<div class="loading">加载灵信...</div>';
+  try {
+    var r = await authFetch('/api/lingmessage?status=open');
+    if (!r) return;
+    _mailList = await r.json();
+
+    var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+    html += '<h2 style="font-size:18px;font-weight:600">✉️ 灵信</h2>';
+    html += '<div style="display:flex;gap:6px">';
+    html += '<button onclick="composeMail()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer">写信</button>';
+    html += '<span style="font-size:12px;color:var(--dim);align-self:center">' + _mailList.length + ' 封</span>';
+    html += '</div></div>';
+
+    if (_mailList.length === 0) {
+      html += '<div class="empty">暂无灵信</div>';
+    } else {
+      _mailList.forEach(function(d) {
+        var initiator = d.initiator_name || memberName(d.initiator || '');
+        var unread = d.initiator && d.initiator !== 'guangda';
+        var lastMsg = d.summary || d.topic;
+        html += '<div class="mail-item" onclick="showMailDetail(\'' + esc(d.id) + '\')">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+        html += '<span class="mail-from">' + (unread ? '📩 ' : '📤 ') + esc(initiator) + '</span>';
+        html += '<span class="mail-time">' + (d.updated_at || d.created_at || '').slice(5,16).replace('T',' ') + '</span>';
+        html += '</div>';
+        html += '<div class="mail-topic">' + esc(d.topic) + '</div>';
+        html += '<div class="mail-meta"><span>' + d.message_count + ' 条</span>';
+        if (d.participants && d.participants.length) {
+          html += '<span>' + esc(d.participants.map(function(p){return memberName(p);}).join(' · ')) + '</span>';
+        }
+        html += '</div>';
+        html += '<div class="mail-preview">' + esc(lastMsg) + '</div>';
+        html += '</div>';
+      });
+    }
+    listEl.innerHTML = html;
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+async function showMailDetail(discId) {
+  var listEl = document.getElementById('mailList');
+  var detailEl = document.getElementById('mailDetail');
+  var composeEl = document.getElementById('mailCompose');
+  listEl.style.display = 'none';
+  composeEl.style.display = 'none';
+  detailEl.style.display = '';
+  detailEl.innerHTML = '<div class="loading">加载信件...</div>';
+
+  try {
+    var r = await authFetch('/api/lingmessage/' + encodeURIComponent(discId));
+    if (!r) return;
+    var disc = await r.json();
+
+    var html = '<div class="back-btn" onclick="loadMail()">← 返回灵箱</div>';
+    html += '<h2 style="font-size:16px;font-weight:600;margin-bottom:4px;line-height:1.4">' + esc(disc.topic) + '</h2>';
+    html += '<div style="font-size:11px;color:var(--dim);margin-bottom:12px">';
+    html += esc(disc.initiator_name || disc.initiator || '') + ' 发起';
+    if (disc.participants && disc.participants.length) {
+      html += ' · ' + esc(disc.participants.map(function(p){return memberName(p);}).join(' · '));
+    }
+    html += ' · ' + (disc.message_count || (disc.messages||[]).length) + ' 条消息';
+    html += '</div>';
+
+    var msgs = disc.messages || [];
+    msgs.forEach(function(m) {
+      var sender = m.from_name || m.sender || m.from || '';
+      var isMe = sender === '广大老师' || m.from_id === 'guangda';
+      html += '<div class="disc-detail-msg">';
+      html += '<div class="disc-msg-header">';
+      html += '<span class="disc-msg-sender">' + (isMe ? '📤 ' : '📩 ') + esc(sender) + '</span>';
+      html += '<span class="disc-msg-type">' + esc(m.source_type || m.type || '') + '</span>';
+      var mt = m.timestamp || m.created_at || m.time || '';
+      if (mt) html += '<span class="disc-msg-time">' + mt.slice(0,19).replace('T',' ') + '</span>';
+      html += '</div>';
+      html += '<div class="disc-msg-body">' + esc(m.content || m.body || m.text || '') + '</div>';
+      html += '</div>';
+    });
+
+    if (msgs.length === 0) {
+      html += '<div class="empty">暂无消息</div>';
+    }
+
+    html += '<div class="new-disc-bar" style="margin-top:12px"><input type="text" id="mailReply" placeholder="回复此信..."><button onclick="replyMail(\'' + esc(discId) + '\',\'' + esc(disc.topic).replace(/'/g, "\\'") + '\')">发送</button></div>';
+
+    detailEl.innerHTML = html;
+    detailEl.scrollTop = detailEl.scrollHeight;
+  } catch(e) {
+    detailEl.innerHTML = '<div class="back-btn" onclick="loadMail()">← 返回灵箱</div><div class="empty">加载失败</div>';
+  }
+}
+
+function composeMail() {
+  var listEl = document.getElementById('mailList');
+  var detailEl = document.getElementById('mailDetail');
+  var composeEl = document.getElementById('mailCompose');
+  listEl.style.display = 'none';
+  detailEl.style.display = 'none';
+  composeEl.style.display = '';
+
+  var html = '<div class="back-btn" onclick="loadMail()">← 返回灵箱</div>';
+  html += '<h2 style="font-size:16px;font-weight:600;margin-bottom:12px">✉️ 写信</h2>';
+  html += '<div class="mail-compose-bar">';
+  html += '<input type="text" id="mailTo" placeholder="收信人（灵通/灵知/灵依/灵克...）" readonly value="全体成员" style="color:var(--dim)">';
+  html += '<input type="text" id="mailTopic" placeholder="主题">';
+  html += '<textarea id="mailContent" placeholder="信件内容..."></textarea>';
+  html += '<div class="mail-compose-actions">';
+  html += '<button class="secondary" onclick="loadMail()">取消</button>';
+  html += '<button onclick="sendMail()">发送</button>';
+  html += '</div>';
+  html += '</div>';
+  composeEl.innerHTML = html;
+}
+
+async function sendMail() {
+  var topic = document.getElementById('mailTopic').value.trim();
+  var content = document.getElementById('mailContent').value.trim();
+  if (!topic || !content) { alert('主题和内容不能为空'); return; }
+  try {
+    await authFetch('/api/lingmessage/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic: topic, content: content, from_id: 'guangda'})
+    });
+    loadMail();
+  } catch(e) { alert('发送失败: ' + e.message); }
+}
+
+async function replyMail(discId, topic) {
+  var inp = document.getElementById('mailReply');
+  var content = inp.value.trim();
+  if (!content) return;
+  inp.value = '';
+  try {
+    await authFetch('/api/lingmessage/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic: topic, content: content, from_id: 'guangda'})
+    });
+    showMailDetail(discId);
+  } catch(e) {}
+}
+
 // ── Schedules ───────────────────────────────────────────
 async function loadSchedules() {
   try {
@@ -639,25 +850,87 @@ async function delMemo(id) {
 }
 
 // ── Projects ────────────────────────────────────────────
+var _STATUS_CN = {active:'活跃', maintenance:'维护', paused:'暂停', archived:'归档'};
+var _CAT_CN = {core:'核心', knowledge:'知识', tool:'工具', content:'内容', research:'研究', infra:'基础设施', app:'应用'};
+var _PRI_CN = {P0:'紧急', P1:'高', P2:'中', P3:'低'};
+
 async function loadProjects() {
+  var pg = document.getElementById('pgProjects');
+  pg.innerHTML = '<div class="empty">加载中...</div>';
   try {
-    const r = await authFetch('/api/projects');
+    const r = await authFetch('/api/projects/live');
     if (!r) return;
     const projects = await r.json();
-    const pg = document.getElementById('pgProjects');
-    let html = '<h2 style="font-size:18px;font-weight:600;margin-bottom:12px">项目</h2>';
-    if (projects.length === 0) {
-      html += '<div class="empty">暂无项目</div>';
-    } else {
-      html += '<div class="card">';
-      projects.forEach(function(p, i) {
-        html += '<div class="proj-item"><span class="proj-pri ' + (p.priority||'P3') + '">' + (p.priority||'P3') + '</span><span class="proj-name">' + esc(p.name) + '</span><span class="proj-alias">' + esc(p.alias||'') + '</span>' + (p.energy_pct || p.energy ? '<span class="proj-energy">' + (p.energy_pct||p.energy) + '%</span>' : '') + '</div>';
+
+    var groups = {};
+    ['active','maintenance','paused','archived'].forEach(function(s) { groups[s] = []; });
+    projects.forEach(function(p) { (groups[p.status] || groups.archived).push(p); });
+
+    var html = '';
+    ['active','maintenance','paused','archived'].forEach(function(status) {
+      var list = groups[status];
+      if (!list.length) return;
+      html += '<div class="live-section">' + _STATUS_CN[status] + '<span class="count">(' + list.length + ')</span></div>';
+      list.forEach(function(p) {
+        var g = p.git || {};
+        html += '<div class="live-card">';
+
+        // header: name + alias + priority + status
+        html += '<div class="live-head">';
+        html += '<span class="proj-pri ' + (p.priority||'P3') + '">' + (p.priority||'P3') + '</span>';
+        html += '<span class="live-name">' + esc(p.name) + '</span>';
+        if (p.alias) html += '<span class="live-alias">' + esc(p.alias) + '</span>';
+        html += '<span class="live-tag ' + status + '">' + _STATUS_CN[status] + '</span>';
+        html += '</div>';
+
+        // description
+        if (p.description) html += '<div class="live-desc">' + esc(p.description) + '</div>';
+
+        // git info
+        if (g.repo_found) {
+          html += '<div class="live-git">';
+          if (g.branch) html += '<span><b>' + esc(g.branch) + '</b></span>';
+          if (g.tag) html += '<span>标签 <b>' + esc(g.tag) + '</b></span>';
+          else if (p.version) html += '<span>版本 <b>' + esc(p.version) + '</b></span>';
+          if (g.last_commit_time) html += '<span>' + esc(g.last_commit_time) + '</span>';
+
+          // week activity dots (7 squares)
+          if (g.week_commits !== undefined) {
+            html += '<span>近7天 ';
+            var n = Math.min(g.week_commits || 0, 7);
+            html += '<span class="live-dots">';
+            for (var i = 0; i < 7; i++) html += '<span class="live-dot ' + (i < n ? 'on' : 'off') + '"></span>';
+            html += '</span> ' + (g.week_commits||0) + '提交';
+            html += '</span>';
+          }
+
+          if (g.dirty_files) html += '<span class="live-dirty">⚡' + g.dirty_files + '未提交</span>';
+          html += '</div>';
+
+          // last commit
+          if (g.last_commit) html += '<div class="live-commit">' + esc(g.last_commit) + '</div>';
+        } else {
+          html += '<div class="live-git"><span style="color:#6b7280">无本地仓库</span>';
+          if (p.version) html += ' · 版本 <b>' + esc(p.version) + '</b>';
+          html += '</div>';
+        }
+
+        // discussions
+        if (p.discussions && p.discussions.length) {
+          html += '<div class="live-disc">';
+          p.discussions.forEach(function(d) {
+            html += '<span>💬 ' + esc(d.topic) + ' (' + d.messages + '条)</span>';
+          });
+          html += '</div>';
+        }
+
+        html += '</div>'; // .live-card
       });
-      html += '</div>';
-    }
-    pg.innerHTML = html;
+    });
+
+    pg.innerHTML = html || '<div class="empty">暂无项目</div>';
   } catch(e) {
-    document.getElementById('pgProjects').innerHTML = '<div class="empty">加载失败</div>';
+    pg.innerHTML = '<div class="empty">加载失败: ' + esc(e.message||'') + '</div>';
   }
 }
 
@@ -729,15 +1002,14 @@ function onDirectMsg(e) {
     loadSessions();
     var area = document.getElementById('chatArea');
     area.innerHTML = '';
-    // 重置日期状态
     _lastMsgDate = null;
     _currentDateGroup = null;
-    // 按日期排序历史消息
     var sortedMsgs = msg.messages.sort(function(a, b) {
       return new Date(a.created_at || 0) - new Date(b.created_at || 0);
     });
     sortedMsgs.forEach(function(m) { addChatMsg(m.role === 'user' ? 'user' : 'bot', m.content); });
-    setTimeout(function() { area.scrollTop = area.scrollHeight; }, 100);
+    autoFoldOldDateGroups(area);
+    setTimeout(function() { area.scrollTop = area.scrollHeight; }, 150);
     return;
   }
   if (msg.type === 'recognized') { addChatMsg('user', msg.text); return; }
@@ -748,6 +1020,9 @@ function onDirectMsg(e) {
       return new Date(a.created_at || 0) - new Date(b.created_at || 0);
     });
     sortedMsgs.forEach(function(m) { addChatMsg(m.role === 'user' ? 'user' : 'bot', m.content); });
+    var area = document.getElementById('chatArea');
+    autoFoldOldDateGroups(area);
+    setTimeout(function() { area.scrollTop = area.scrollHeight; }, 150);
     return;
   }
   if (msg.type === 'push') { handlePush(msg); return; }
@@ -948,6 +1223,33 @@ function toggleMic() {
 }
 
 // ── Session Management ───────────────────────────────────────
+function autoFoldOldDateGroups(area) {
+  var groups = area.querySelectorAll('.date-group');
+  if (groups.length <= 1) return;
+  for (var i = 0; i < groups.length - 1; i++) {
+    groups[i].classList.add('collapsed');
+    var divider = groups[i].previousElementSibling;
+    if (divider && divider.classList.contains('date-divider')) {
+      divider.classList.add('collapsed');
+    }
+  }
+}
+
+async function cleanupSessions() {
+  try {
+    var r = await authFetch('/api/sessions');
+    if (!r) return;
+    var sessions = await r.json();
+    var empty = sessions.filter(function(s) { return s.session_id !== 'default' && (!s.message_count || s.message_count === 0); });
+    if (empty.length === 0) { alert('没有空会话需要清理'); return; }
+    if (!confirm('找到 ' + empty.length + ' 个空会话，是否删除？')) return;
+    for (var i = 0; i < empty.length; i++) {
+      await authFetch('/api/sessions/' + encodeURIComponent(empty[i].session_id), {method: 'DELETE'});
+    }
+    loadSessions();
+  } catch(e) { alert('清理失败: ' + e.message); }
+}
+
 function toggleSessionPanel() {
   var panel = document.getElementById('sessionPanel');
   if (panel.style.display === 'none') {
@@ -956,6 +1258,54 @@ function toggleSessionPanel() {
   } else {
     panel.style.display = 'none';
   }
+}
+
+function _sessionDateGroup(updated_at) {
+  if (!updated_at) return '更早';
+  var d = new Date(updated_at);
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var yesterday = new Date(today.getTime() - 86400000);
+  var dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (dDay.getTime() === today.getTime()) return '今天';
+  if (dDay.getTime() === yesterday.getTime()) return '昨天';
+  if (now - dDay < 7 * 86400000) return '近7天';
+  if (now - dDay < 30 * 86400000) return '近30天';
+  return '更早';
+}
+
+function _isOldGroup(label) {
+  return label === '近30天' || label === '更早';
+}
+
+function _toggleSessionDateGroup(el) {
+  var items = el.nextElementSibling;
+  var arrow = el.querySelector('.arrow');
+  if (!items) return;
+  if (items.classList.contains('collapsed')) {
+    items.classList.remove('collapsed');
+    items.style.maxHeight = items.scrollHeight + 'px';
+    if (arrow) arrow.classList.remove('collapsed');
+  } else {
+    items.style.maxHeight = items.scrollHeight + 'px';
+    requestAnimationFrame(function() { items.classList.add('collapsed'); });
+    if (arrow) arrow.classList.add('collapsed');
+  }
+}
+
+function _renderSessionItem(s) {
+  var isActive = s.session_id === _currentSessionId;
+  var t = s.updated_at ? s.updated_at.slice(5,16).replace('T',' ') : '';
+  var isDefault = s.session_id === 'default';
+  var h = '<div class="session-item' + (isActive?' active':'') + '" onclick="switchSession(\'' + esc(s.session_id) + '\')">';
+  h += '<span class="session-item-title">' + esc(s.title) + (isDefault?'（默认）':'') + '</span>';
+  h += '<span class="session-item-meta">' + s.message_count + ' 条</span>';
+  h += '<span class="session-item-meta">' + t + '</span>';
+  if (!isDefault) {
+    h += '<span class="session-item-del" onclick="event.stopPropagation();deleteSession(\'' + esc(s.session_id) + '\',\'' + esc(s.title).replace(/'/g, "\\'") + '\')">×</span>';
+  }
+  h += '</div>';
+  return h;
 }
 
 async function loadSessions() {
@@ -969,18 +1319,25 @@ async function loadSessions() {
     if (sessions.length === 0) {
       html = '<div class="empty">暂无会话</div>';
     } else {
+      var groups = {};
+      var order = [];
       sessions.forEach(function(s) {
-        var isActive = s.session_id === _currentSessionId;
-        var t = s.updated_at ? s.updated_at.slice(5,16).replace('T',' ') : '';
-        var isDefault = s.session_id === 'default';
-        html += '<div class="session-item' + (isActive?' active':'') + '" onclick="switchSession(\'' + esc(s.session_id) + '\')">';
-        html += '<span class="session-item-title">' + esc(s.title) + (isDefault?'（默认）':'') + '</span>';
-        html += '<span class="session-item-meta">' + s.message_count + ' 条</span>';
-        html += '<span class="session-item-meta">' + t + '</span>';
-        if (!isDefault) {
-          html += '<span class="session-item-del" onclick="event.stopPropagation();deleteSession(\'' + esc(s.session_id) + '\',\'' + esc(s.title).replace(/'/g, "\\'") + '\')">×</span>';
-        }
+        var label = _sessionDateGroup(s.updated_at);
+        if (!groups[label]) { groups[label] = []; order.push(label); }
+        groups[label].push(s);
+      });
+      order.forEach(function(label) {
+        var items = groups[label];
+        var isOld = _isOldGroup(label);
+        html += '<div class="session-date-group">';
+        html += '<div class="session-date-label" onclick="_toggleSessionDateGroup(this)">';
+        html += '<span class="arrow' + (isOld ? ' collapsed' : '') + '">▼</span>';
+        html += '<span>' + esc(label) + '</span>';
+        html += '<span style="margin-left:auto;font-size:10px">' + items.length + ' 个</span>';
         html += '</div>';
+        html += '<div class="session-date-items' + (isOld ? ' collapsed' : '') + '"' + (isOld ? '' : ' style="max-height:9999px"') + '>';
+        items.forEach(function(s) { html += _renderSessionItem(s); });
+        html += '</div></div>';
       });
     }
     listEl.innerHTML = html;
@@ -1138,7 +1495,7 @@ function probeModels() {
   var btn = document.getElementById('probeBtn');
   var result = document.getElementById('probeResult');
   btn.disabled = true; btn.textContent = '探测中...';
-  result.style.display = 'block'; result.textContent = '正在测试高级模型可用性...';
+  result.style.display = 'block'; result.textContent = '正在测试全部模型可用性...';
   authFetch('/api/models?action=probe', {method: 'POST'})
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -1148,12 +1505,12 @@ function probeModels() {
         html += '<div style="margin:4px 0">' + (r.available?'\u2705':'\u274c') + ' <b>' + esc(r.model) + '</b> — <span style="color:' + c + '">' + (r.available ? '可用' : esc(r.reason||'不可用')) + '</span></div>';
       });
       result.innerHTML = html;
-      btn.disabled = false; btn.textContent = '探测高级模型';
+      btn.disabled = false; btn.textContent = '探测全部模型';
       loadModels();
     })
     .catch(function(e) {
       result.textContent = '探测失败: ' + e.message;
-      btn.disabled = false; btn.textContent = '探测高级模型';
+      btn.disabled = false; btn.textContent = '探测全部模型';
     });
 }
 function loadUsage() {

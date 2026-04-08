@@ -7,6 +7,12 @@ from .models import Project
 _STATUS_ORDER = {"active": 0, "maintenance": 1, "paused": 2, "archived": 3}
 _PRIORITY_ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 
+_PROJECT_FIELDS = {f.name for f in Project.__dataclass_fields__.values()}
+
+
+def _row_to_project(row) -> Project:
+    return Project(**{k: v for k, v in dict(row).items() if k in _PROJECT_FIELDS})
+
 _STATUS_CN = {
     "active": "活跃", "maintenance": "维护", "paused": "暂停", "archived": "归档",
 }
@@ -28,10 +34,10 @@ def init_projects() -> list[Project]:
         return list_projects()
     for data in _PROJECTS_DATA:
         conn.execute(
-            "INSERT INTO projects (name, alias, status, priority, category, description, repo, version, energy_pct) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO projects (name, alias, status, priority, category, description, repo, version) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (data["name"], data["alias"], data["status"], data["priority"],
-             data["category"], data["description"], data["repo"], data["version"], data["energy_pct"]),
+             data["category"], data["description"], data["repo"], data["version"]),
         )
     conn.commit()
     result = list_projects()
@@ -41,17 +47,17 @@ def init_projects() -> list[Project]:
 
 def add_project(name: str, alias: str = "", status: str = "active", priority: str = "P3",
                 category: str = "tool", description: str = "", repo: str = "",
-                version: str = "", energy_pct: int = 0, notes: str = "") -> Project:
+                version: str = "", notes: str = "") -> Project:
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO projects (name, alias, status, priority, category, description, repo, version, energy_pct, notes) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (name, alias, status, priority, category, description, repo, version, energy_pct, notes),
+        "INSERT INTO projects (name, alias, status, priority, category, description, repo, version, notes) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (name, alias, status, priority, category, description, repo, version, notes),
     )
     row = conn.execute("SELECT * FROM projects WHERE id = ?", (cur.lastrowid,)).fetchone()
     conn.commit()
     conn.close()
-    return Project(**dict(row))
+    return _row_to_project(row)
 
 
 def list_projects(status: str | None = None, category: str | None = None) -> list[Project]:
@@ -70,7 +76,7 @@ def list_projects(status: str | None = None, category: str | None = None) -> lis
     sql += " ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, name"
     rows = conn.execute(sql, params).fetchall()
     conn.close()
-    return [Project(**dict(r)) for r in rows]
+    return [_row_to_project(r) for r in rows]
 
 
 def show_project(name_or_alias: str) -> Project | None:
@@ -80,7 +86,7 @@ def show_project(name_or_alias: str) -> Project | None:
         (name_or_alias, name_or_alias),
     ).fetchone()
     conn.close()
-    return Project(**dict(row)) if row else None
+    return _row_to_project(row) if row else None
 
 
 def update_project(name_or_alias: str, **kwargs) -> Project | None:
@@ -101,16 +107,15 @@ def update_project(name_or_alias: str, **kwargs) -> Project | None:
     conn.commit()
     row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     conn.close()
-    return Project(**dict(row)) if row else None
+    return _row_to_project(row) if row else None
 
 
 def format_project_short(p: Project) -> str:
     status_cn = _STATUS_CN.get(p.status, p.status)
     priority_cn = _PRIORITY_CN.get(p.priority, p.priority)
     alias = f"（{p.alias}）" if p.alias else ""
-    energy = f" [{p.energy_pct}%]" if p.energy_pct else ""
     ver = f" {p.version}" if p.version else ""
-    return f"  [{p.id}] {p.name}{alias}  {status_cn}  {priority_cn}{ver}{energy}"
+    return f"  [{p.id}] {p.name}{alias}  {status_cn}  {priority_cn}{ver}"
 
 
 def format_project_detail(p: Project) -> str:
@@ -122,7 +127,6 @@ def format_project_detail(p: Project) -> str:
         f"  说明：{p.description or '—'}",
         f"  仓库：{p.repo or '—'}",
         f"  版本：{p.version or '—'}",
-        f"  精力分配：{p.energy_pct}%",
         f"  备注：{p.notes or '—'}",
         f"  创建：{p.created_at}",
     ]

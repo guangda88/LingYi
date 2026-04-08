@@ -49,14 +49,13 @@ def register(group: click.Group):
     @click.option("--desc", default="", help="说明")
     @click.option("--repo", default="", help="仓库名")
     @click.option("--version", default="", help="版本")
-    @click.option("--energy", default=0, type=int, help="精力分配百分比")
     @click.option("--notes", default="", help="备注")
     def project_add(name: str, alias: str, status: str, priority: str, category: str,
-                    desc: str, repo: str, version: str, energy: int, notes: str):
+                    desc: str, repo: str, version: str, notes: str):
         """添加项目"""
         p = proj_mod.add_project(name, alias=alias, status=status, priority=priority,
                                  category=category, description=desc, repo=repo,
-                                 version=version, energy_pct=energy, notes=notes)
+                                 version=version, notes=notes)
         click.echo(f"✓ 项目「{p.name}」已添加")
 
     @group.command("update")
@@ -68,11 +67,10 @@ def register(group: click.Group):
     @click.option("--desc", default=None, help="说明")
     @click.option("--repo", default=None, help="仓库名")
     @click.option("--version", default=None, help="版本")
-    @click.option("--energy", default=None, type=int, help="精力分配百分比")
     @click.option("--notes", default=None, help="备注")
     def project_update(name: str, alias: str | None, status: str | None, priority: str | None,
                        category: str | None, desc: str | None, repo: str | None,
-                       version: str | None, energy: int | None, notes: str | None):
+                       version: str | None, notes: str | None):
         """更新项目"""
         kwargs = {}
         if alias is not None: kwargs["alias"] = alias
@@ -82,7 +80,6 @@ def register(group: click.Group):
         if desc is not None: kwargs["description"] = desc
         if repo is not None: kwargs["repo"] = repo
         if version is not None: kwargs["version"] = version
-        if energy is not None: kwargs["energy_pct"] = energy
         if notes is not None: kwargs["notes"] = notes
         p = proj_mod.update_project(name, **kwargs)
         if not p:

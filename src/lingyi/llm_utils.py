@@ -10,8 +10,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _PRIMARY_MODEL = os.environ.get("GLM_MODEL", "glm-5.1")
-_FALLBACK_MODELS = ["glm-5", "glm-4.5-air", "glm-4-flash"]
+GLM_CODING_PLAN_MODELS = [
+    "glm-5.1", "glm-5-turbo", "glm-5", "glm-4.7", "glm-4.7-flash",
+    "glm-4.6", "glm-4.6v", "glm-4.5", "glm-4.5-air", "glm-4.5v",
+]
+_FALLBACK_MODELS = [m for m in GLM_CODING_PLAN_MODELS if m != _PRIMARY_MODEL]
 _GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+_GLM_CODING_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4"
 
 _RESET_ANCHOR_HOUR = 15
 _RESET_ANCHOR_MIN = 57
@@ -30,10 +35,11 @@ _usage_lock = threading.Lock()
 
 GLM_API_KEY = ""
 GLM_BASE_URL = _GLM_BASE_URL
+_USE_CODING_PLAN = False
 
 
 def _init_keys() -> None:
-    global GLM_API_KEY, _GLM_BASE_URL
+    global GLM_API_KEY, GLM_BASE_URL, _GLM_BASE_URL, _USE_CODING_PLAN
     import importlib.util
     lib_path = Path.home() / ".ling_lib" / "ling_key_store.py"
     if not lib_path.exists():
@@ -43,8 +49,16 @@ def _init_keys() -> None:
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         get_key = mod.get_key
-        GLM_API_KEY = get_key("GLM_CODING_PLAN_KEY") or get_key("GLM_API_KEY") or ""
-        _GLM_BASE_URL = get_key("GLM_BASE_URL") or _GLM_BASE_URL
+        coding_key = get_key("GLM_CODING_PLAN_KEY")
+        if coding_key:
+            GLM_API_KEY = coding_key
+            _GLM_BASE_URL = get_key("GLM_CODING_BASE_URL") or _GLM_CODING_BASE_URL
+            GLM_BASE_URL = _GLM_BASE_URL
+            _USE_CODING_PLAN = True
+        else:
+            GLM_API_KEY = get_key("GLM_API_KEY") or ""
+            _GLM_BASE_URL = get_key("GLM_BASE_URL") or _GLM_BASE_URL
+            GLM_BASE_URL = _GLM_BASE_URL
     except Exception:
         pass
 
@@ -106,16 +120,16 @@ def _get_available_models(primary_model: str | None = None) -> list[str]:
 
 
 def probe_premium_models() -> dict[str, str]:
-    """探测 premium 模型是否可用，返回 {model: 'available'/'exhausted'}。"""
+    """探测所有 Coding Plan 模型是否可用，返回 {model: 'available'/'exhausted'}。"""
     global _last_probe_time
     _last_probe_time = time.time()
 
-    premium = [_PRIMARY_MODEL] + [m for m in _FALLBACK_MODELS if m not in ("glm-4.5-air", "glm-4-flash")]
+    models_to_test = GLM_CODING_PLAN_MODELS
     results = {}
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=GLM_API_KEY, base_url=GLM_BASE_URL, max_retries=0)
-        for model in premium:
+        client = OpenAI(api_key=GLM_API_KEY, base_url=GLM_BASE_URL, max_retries=0, timeout=15)
+        for model in models_to_test:
             try:
                 client.chat.completions.create(
                     model=model,
@@ -129,14 +143,11 @@ def probe_premium_models() -> dict[str, str]:
                 err = str(e)
                 if "1113" in err or "余额不足" in err or "429" in err:
                     results[model] = "exhausted"
+                    _quota_exhausted[model] = _next_reset_time()
                 else:
                     results[model] = f"error: {err[:50]}"
     except Exception as e:
         logger.error(f"探测失败: {e}")
-
-    # 免费模型始终可用
-    for m in ("glm-4.5-air", "glm-4-flash"):
-        results[m] = "available"
 
     return results
 
