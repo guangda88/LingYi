@@ -115,10 +115,13 @@ def _transcribe_whisper(audio_path: str) -> dict:
 def _transcribe_sherpa(audio_path: str) -> dict:
     """使用 sherpa-onnx 转录。"""
     try:
-        import sherpa_onnx
+        import importlib.util
+        if not importlib.util.find_spec("sherpa_onnx"):
+            return {"text": "", "available": False, "backend": "sherpa_onnx",
+                    "error": "sherpa_onnx 未安装"}
         return {"text": "", "available": False, "backend": "sherpa_onnx",
                 "error": "sherpa-onnx 支持待实现"}
-    except ImportError:
+    except Exception:
         return {"text": "", "available": False, "backend": "sherpa_onnx",
                 "error": "sherpa_onnx 未安装"}
 

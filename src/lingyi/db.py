@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS projects (
     description TEXT DEFAULT '',
     repo TEXT DEFAULT '',
     version TEXT DEFAULT '',
-    energy_pct INTEGER DEFAULT 0,
     notes TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -73,14 +73,22 @@ def register(group: click.Group):
                        version: str | None, notes: str | None):
         """更新项目"""
         kwargs = {}
-        if alias is not None: kwargs["alias"] = alias
-        if status is not None: kwargs["status"] = status
-        if priority is not None: kwargs["priority"] = priority
-        if category is not None: kwargs["category"] = category
-        if desc is not None: kwargs["description"] = desc
-        if repo is not None: kwargs["repo"] = repo
-        if version is not None: kwargs["version"] = version
-        if notes is not None: kwargs["notes"] = notes
+        if alias is not None:
+            kwargs["alias"] = alias
+        if status is not None:
+            kwargs["status"] = status
+        if priority is not None:
+            kwargs["priority"] = priority
+        if category is not None:
+            kwargs["category"] = category
+        if desc is not None:
+            kwargs["description"] = desc
+        if repo is not None:
+            kwargs["repo"] = repo
+        if version is not None:
+            kwargs["version"] = version
+        if notes is not None:
+            kwargs["notes"] = notes
         p = proj_mod.update_project(name, **kwargs)
         if not p:
             click.echo(f"项目「{name}」不存在。")

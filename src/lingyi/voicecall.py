@@ -11,6 +11,8 @@ import tempfile
 import wave
 from pathlib import Path
 
+from .llm_utils import create_client, call_llm_with_fallback, friendly_error
+
 logger = logging.getLogger(__name__)
 
 _SILENCE_LIMIT = 1.2
@@ -280,7 +282,6 @@ def _build_system_prompt() -> str:
 
     return "\n\n".join(parts)
 
-from .llm_utils import create_client, call_llm_with_fallback, friendly_error
 _GLM_MODEL = "glm-4.5-air"
 
 

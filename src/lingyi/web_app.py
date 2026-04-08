@@ -590,15 +590,14 @@ def create_app(password: str | None = None):
                                capture_output=True, text=True, timeout=5).stdout.strip()
 
             branch = _git("branch", "--show-current")
-            last_hash = _git("log", "-1", "--format=%H")
             last_msg = _git("log", "-1", "--format=%s")[:80]
             last_time = _git("log", "-1", "--format=%ar")
             last_iso = _git("log", "-1", "--format=%aI")
             tag = _git("describe", "--tags", "--abbrev=0") or ""
             dirty_raw = _git("status", "--porcelain")
-            dirty = len([l for l in dirty_raw.split("\n") if l.strip()])
+            dirty = len([line for line in dirty_raw.split("\n") if line.strip()])
             week_commits_raw = _git("log", "--oneline", "--since=7 days ago")
-            week_commits = len([l for l in week_commits_raw.split("\n") if l.strip()])
+            week_commits = len([line for line in week_commits_raw.split("\n") if line.strip()])
 
             return {
                 "repo_found": True, "repo_path": str(repo_dir), "branch": branch,
@@ -611,7 +610,6 @@ def create_app(password: str | None = None):
 
     @app.get("/api/projects/live")
     async def api_projects_live():
-        import subprocess as _sp
         from .project import list_projects
         items = list_projects()
 
@@ -945,6 +943,33 @@ def create_app(password: str | None = None):
         await _push_to_all("lingmessage", preview)
         return JSONResponse({"received": True})
 
+    @app.get("/api/lingmessage/inbox/{member_id}")
+    async def api_inbox_get(member_id: str):
+        """获取成员的未读消息。"""
+        from .lingmessage import get_inbox
+        messages = get_inbox(member_id)
+        return JSONResponse({"member_id": member_id, "unread_count": len(messages), "messages": messages})
+
+    @app.post("/api/lingmessage/inbox/{member_id}/read")
+    async def api_inbox_mark_read(member_id: str, request: dict):
+        """标记消息为已读。"""
+        body = await request.json()
+        message_id = body.get("message_id", "")
+        if not message_id:
+            return JSONResponse({"error": "message_id必填"}, status_code=400)
+        from .lingmessage import mark_inbox_read
+        success = mark_inbox_read(member_id, message_id)
+        return JSONResponse({"success": success})
+
+    @app.post("/api/lingmessage/inbox/{member_id}/clean")
+    async def api_inbox_clean(member_id: str, request: dict):
+        """清理已读消息。"""
+        body = await request.json()
+        days = body.get("days", 7)
+        from .lingmessage import clean_read_inbox
+        deleted = clean_read_inbox(member_id, days)
+        return JSONResponse({"deleted": deleted})
+
     def _project_cn(pid: str) -> str:
         _names = {
             "lingflow": "灵通", "lingclaude": "灵克", "lingzhi": "灵知",
@@ -953,6 +978,140 @@ def create_app(password: str | None = None):
             "lingyang": "灵扬", "guangda": "广大老师",
         }
         return _names.get(pid, pid)
+
+    @app.get("/api/lingmessage/delivery/{message_id}")
+    async def api_delivery_status(message_id: str):
+        """获取消息的送达状态详情"""
+        from .lingmessage import get_delivery_status
+        status = get_delivery_status(message_id)
+        return JSONResponse(status)
+
+    # ── 端点健康监控 API ─────────────────────────────────
+
+    @app.get("/api/health/endpoints")
+    async def api_health_endpoints():
+        """获取所有端点的健康状态"""
+        from .endpoint_monitor import get_health_summary
+        return JSONResponse(get_health_summary())
+
+    @app.post("/api/health/check")
+    async def api_health_check():
+        """立即检查所有端点健康状态"""
+        from .endpoint_monitor import check_all_endpoints, get_health_summary
+        check_all_endpoints()
+        return JSONResponse(get_health_summary())
+
+    @app.get("/api/health/summary")
+    async def api_health_summary():
+        """获取健康状态摘要（文本格式）"""
+        from .endpoint_monitor import get_health_summary, format_health_summary
+        summary = get_health_summary()
+        text = format_health_summary(summary)
+        return JSONResponse({"summary": text, "data": summary})
+
+    # ── 统一通信层 API ─────────────────────────────────
+
+    @app.get("/api/unified/online")
+    async def api_unified_online():
+        """获取所有成员的统一在线状态"""
+        from .unified_comm import UnifiedOnlineDetector, UNIFIED_MEMBERS
+        detector = UnifiedOnlineDetector()
+        online_status = detector.check_all_online()
+
+        result = {}
+        for member_id, online in online_status.items():
+            member = UNIFIED_MEMBERS.get(member_id)
+            if member:
+                result[member_id] = {
+                    "name": member.name,
+                    "online": online,
+                }
+
+        return JSONResponse(result)
+
+    @app.post("/api/unified/send")
+    async def api_unified_send(request: Request):
+        """统一发送消息（智能路由）"""
+        body = await request.json()
+        sender_id = body.get("sender_id", "lingyi")
+        recipient_id = body.get("recipient_id")
+        topic = body.get("topic")
+        content = body.get("content")
+        message_type = body.get("message_type", "discussion")
+
+        if not recipient_id or not topic or not content:
+            return JSONResponse(
+                {"error": "recipient_id, topic, and content are required"},
+                status_code=400
+            )
+
+        from .unified_comm import UnifiedOnlineDetector, UnifiedMessageRouter, UNIFIED_MEMBERS
+
+        # 验证发送者和接收者
+        if sender_id not in UNIFIED_MEMBERS:
+            return JSONResponse({"error": f"Unknown sender: {sender_id}"}, status_code=400)
+        if recipient_id not in UNIFIED_MEMBERS:
+            return JSONResponse({"error": f"Unknown recipient: {recipient_id}"}, status_code=400)
+
+        # 发送消息
+        detector = UnifiedOnlineDetector()
+        router = UnifiedMessageRouter(detector)
+        result = router.send_message(sender_id, recipient_id, topic, content, message_type)
+
+        return JSONResponse({
+            "success": result.success,
+            "message_id": result.message_id,
+            "channel": result.channel,
+            "error": result.error,
+            "response_time_ms": result.response_time_ms,
+        })
+
+    @app.get("/api/unified/queue/{recipient_id}")
+    async def api_unified_queue(recipient_id: str):
+        """获取指定收件人的离线队列"""
+        from .unified_comm import OfflineMessageQueue, UNIFIED_MEMBERS
+
+        if recipient_id not in UNIFIED_MEMBERS:
+            return JSONResponse({"error": f"Unknown recipient: {recipient_id}"}, status_code=400)
+
+        queue = OfflineMessageQueue()
+        messages = queue.dequeue(recipient_id)
+
+        return JSONResponse({
+            "recipient_id": recipient_id,
+            "queued_count": len(messages),
+            "messages": [asdict(msg) for msg in messages],
+        })
+
+    @app.get("/api/unified/queue-stats")
+    async def api_unified_queue_stats():
+        """获取所有队列统计"""
+        from .unified_comm import OfflineMessageQueue
+
+        queue = OfflineMessageQueue()
+        stats = queue.get_queue_stats()
+
+        total = sum(stats.values())
+        return JSONResponse({
+            "total_queued": total,
+            "by_recipient": stats,
+        })
+
+    @app.post("/api/unified/retry")
+    async def api_unified_retry():
+        """手动触发队列重试"""
+        from .unified_comm import OfflineMessageQueue, UnifiedOnlineDetector, UnifiedMessageRouter
+
+        queue = OfflineMessageQueue()
+        detector = UnifiedOnlineDetector()
+        router = UnifiedMessageRouter(detector)
+
+        stats = queue.retry_send(router, detector)
+
+        return JSONResponse({
+            "success": True,
+            "stats": stats,
+        })
 
     # ── WebSocket 智能聊天 ─────────────────────────────────
     _DB_PATH = Path.home() / ".lingyi" / "lingyi.db"
@@ -1619,6 +1778,69 @@ def create_app(password: str | None = None):
             return JSONResponse({"replied": True, "content": reply[:200]})
         return JSONResponse({"replied": False, "reason": "已发言/已关闭/API不可用"})
 
+    @app.post("/api/verification/check")
+    async def api_verification_check(request: dict):
+        """验证断言是否符合约束"""
+        from .constraint_layer import Assertion, ConstraintLayer
+
+        member_id = request.get("member_id", "")
+        assertion_type = request.get("assertion_type", "")
+        content = request.get("content", "")
+        tool_call = request.get("tool_call")
+
+        if not member_id or not assertion_type or not content:
+            return JSONResponse({"error": "member_id, assertion_type, and content are required"}, status_code=400)
+
+        constraint = ConstraintLayer()
+        assertion = Assertion(
+            member_id=member_id,
+            assertion_type=assertion_type,
+            content=content,
+            tool_call=tool_call
+        )
+
+        result = constraint.verify_assertion(assertion)
+
+        return JSONResponse({
+            "passed": result.passed,
+            "reason": result.reason,
+            "checks": result.checks,
+            "recommendation": result.recommendation,
+            "requires_fallback": result.requires_fallback
+        })
+
+    @app.get("/api/verification/stats")
+    async def api_verification_stats(days: int = 7):
+        """获取验证统计"""
+        from .constraint_layer import ConstraintLayer
+
+        constraint = ConstraintLayer()
+        stats = constraint.get_verification_stats(days)
+
+        return JSONResponse(stats)
+
+    @app.get("/api/verification/log")
+    async def api_verification_log(days: int = 7, member_id: str | None = None):
+        """获取验证日志"""
+        from .constraint_layer import VerificationMonitor
+        from datetime import datetime
+
+        monitor = VerificationMonitor()
+        logs = monitor._load_logs()
+
+        # 筛选时间范围
+        cutoff = datetime.now().timestamp() - days * 86400
+        recent_logs = [
+            log for log in logs
+            if datetime.fromisoformat(log["timestamp"]).timestamp() > cutoff
+        ]
+
+        # 按成员ID筛选
+        if member_id:
+            recent_logs = [log for log in recent_logs if log["member_id"] == member_id]
+
+        return JSONResponse(recent_logs)
+
     def _load_discussion_for_council(disc_id: str):
         from .lingmessage import _load_discussion, _get_store
         return _load_discussion(_get_store(), disc_id)
@@ -1696,6 +1918,17 @@ def create_app(password: str | None = None):
     async def _start_push_task():
         asyncio.create_task(_auto_push_loop())
         asyncio.create_task(_run_bridge_connector())
+        asyncio.create_task(_auto_health_check_loop())
+
+    async def _auto_health_check_loop():
+        """定期检查端点健康状态（每60秒）"""
+        while True:
+            try:
+                await asyncio.sleep(60)
+                from .endpoint_monitor import check_all_endpoints
+                check_all_endpoints()
+            except Exception as exc:
+                logger.error(f"Health check loop error: {exc}")
 
     return app
 

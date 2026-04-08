@@ -25,7 +25,7 @@ def digest_text(text: str) -> dict:
     if not text or not text.strip():
         return {"todos": [], "decisions": [], "prefs": [], "facts": [], "raw_lines": 0}
 
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
     todos, decisions, prefs, facts = [], [], [], []
 
     for line in lines:

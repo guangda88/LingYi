@@ -213,12 +213,11 @@ class TestProject:
     def test_add_project(self, tmp_db):
         from lingyi.project import add_project
         p = add_project("TestProj", alias="测试", priority="P1", category="core",
-                        description="测试项目", energy_pct=50)
+                        description="测试项目")
         assert p.id == 1
         assert p.name == "TestProj"
         assert p.alias == "测试"
         assert p.priority == "P1"
-        assert p.energy_pct == 50
 
     def test_list_projects(self, tmp_db):
         from lingyi.project import init_projects, list_projects
@@ -1994,7 +1993,7 @@ class TestLingMessage:
         from lingyi.lingmessage import init_store, send_message, read_discussion
         init_store()
         send_message("lingyi", "读取测试", "内容")
-        discussions = send_message("lingflow", "读取测试", "回复")
+        send_message("lingflow", "读取测试", "回复")
         from lingyi.lingmessage import list_discussions
         disc_list = list_discussions()
         disc_id = disc_list[0]["id"]

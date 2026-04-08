@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -27,10 +28,8 @@ _quota_exhausted: dict[str, float] = {}
 _last_probe_time: float = 0.0
 _probe_interval = 300
 
-import threading
-
-_usage_tracker: dict[str, dict] = {}
 _usage_lock = threading.Lock()
+_usage_tracker: dict[str, dict] = {}
 
 
 GLM_API_KEY = ""

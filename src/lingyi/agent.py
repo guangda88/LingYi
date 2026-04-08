@@ -1,14 +1,5 @@
 from __future__ import annotations
 
-"""灵依 Agent — 统一通信层。
-
-不是简单的 LLM wrapper，而是灵依的真正大脑：
-- 关键词快捷路由（备忘、日程、计划...）
-- LLM + function calling（查 GitHub、查 PyPI、搜灵信...）
-- 情报收集（灵字辈生态状态）
-- 灵信读写（跨项目协作）
-"""
-
 import json
 import logging
 import os
@@ -16,11 +7,11 @@ import urllib.parse
 import urllib.request
 from typing import Callable
 
+from .llm_utils import create_client, call_llm_with_fallback, friendly_error
+
 logger = logging.getLogger(__name__)
 
 _DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
-
-from .llm_utils import create_client, call_llm_with_fallback, friendly_error
 
 _ToolFn = Callable[..., str]
 

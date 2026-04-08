@@ -41,7 +41,7 @@ def check_project(name: str, path: str) -> dict:
         info["changes"].append("已暂存未提交:\n  " + staged.replace("\n", "\n  "))
 
     status_short = run_git(path, "status", "--short")
-    untracked = [l for l in status_short.split("\n") if l.startswith("??")]
+    untracked = [line for line in status_short.split("\n") if line.startswith("??")]
     if untracked:
         info["changes"].append(f"未跟踪文件({len(untracked)}个)")
 
