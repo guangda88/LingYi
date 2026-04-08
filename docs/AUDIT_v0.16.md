@@ -141,7 +141,7 @@ FAILED test_mcp_integration.py::TestToolDescriptionCompliance::test_descriptions
 - [x] 灵依自审完成
 - [x] 提交灵通复审
 - [ ] 合并审查报告
-- [ ] 幻觉发现上报灵妍
+- [x] 幻觉发现上报灵妍（已发送研究资料至disc_20260408192424）
 - [x] 建立任务清单
 - [x] 实施P0修复
 - [x] 测试全绿

@@ -158,7 +158,6 @@ def check_remind() -> list[Schedule]:
     items = today_schedules()
     return [s for s in items if s.type == "clinic"]
 
-
 def smart_remind() -> str:
     """智能提醒：综合日程、偏好、会话记忆给出建议。"""
     from . import pref as pref_mod

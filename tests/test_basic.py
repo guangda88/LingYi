@@ -1942,13 +1942,13 @@ class TestDbDirect:
 
 class TestLingMessage:
     def test_init_store(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store
         result = init_store()
         assert result["initialized"] is True
 
     def test_send_message_creates_discussion(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message
         init_store()
         msg = send_message("lingyi", "灵字辈未来", "我认为我们应该先打通知识闭环")
@@ -1959,7 +1959,7 @@ class TestLingMessage:
         assert msg.id.startswith("msg_")
 
     def test_send_message_appends_to_existing(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions
         init_store()
         send_message("lingyi", "测试话题", "第一条消息")
@@ -1971,13 +1971,13 @@ class TestLingMessage:
         assert "灵通" in discussions[0]["participants"]
 
     def test_list_discussions_empty(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import list_discussions
         result = list_discussions()
         assert result == []
 
     def test_list_discussions_by_status(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions, close_discussion
         init_store()
         send_message("lingyi", "开放话题", "讨论中")
@@ -1989,7 +1989,7 @@ class TestLingMessage:
         assert len(list_discussions(status="closed")) == 1
 
     def test_read_discussion(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, read_discussion
         init_store()
         send_message("lingyi", "读取测试", "内容")
@@ -2003,12 +2003,12 @@ class TestLingMessage:
         assert len(disc["messages"]) == 2
 
     def test_read_discussion_not_found(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import read_discussion
         assert read_discussion("disc_nonexistent") is None
 
     def test_reply_to_discussion(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions, reply_to_discussion
         init_store()
         send_message("lingyi", "回复测试", "原始消息")
@@ -2020,7 +2020,7 @@ class TestLingMessage:
         assert "回复" in msg.content
 
     def test_reply_to_closed_discussion(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions, close_discussion, reply_to_discussion
         init_store()
         send_message("lingyi", "关闭测试", "消息")
@@ -2030,7 +2030,7 @@ class TestLingMessage:
         assert result is None
 
     def test_close_discussion(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions, close_discussion
         init_store()
         send_message("lingyi", "关闭话题", "消息")
@@ -2039,7 +2039,7 @@ class TestLingMessage:
         assert close_discussion("disc_nonexistent") is False
 
     def test_search_messages(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, search_messages
         init_store()
         send_message("lingyi", "搜索测试", "知识闭环是灵字辈的核心方向")
@@ -2095,7 +2095,7 @@ class TestLingMessage:
         assert "不存在" in format_discussion_thread(None)
 
     def test_send_with_tags(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions, read_discussion
         init_store()
         send_message("lingyi", "标签测试", "带标签的消息", tags=["战略", "v0.14"])
@@ -2106,7 +2106,7 @@ class TestLingMessage:
 
 class TestLingMessageCLI:
     def test_msg_send_cli(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -2115,7 +2115,7 @@ class TestLingMessageCLI:
         assert "已发送" in r.output
 
     def test_msg_send_invalid_project(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -2123,7 +2123,7 @@ class TestLingMessageCLI:
         assert "未知项目" in r.output
 
     def test_msg_list_cli_empty(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -2132,7 +2132,7 @@ class TestLingMessageCLI:
         assert "暂无" in r.output
 
     def test_msg_list_cli_with_data(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message
         init_store()
         send_message("lingyi", "CLI列表测试", "测试消息")
@@ -2144,7 +2144,7 @@ class TestLingMessageCLI:
         assert "CLI列表测试" in r.output
 
     def test_msg_read_cli(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions
         init_store()
         send_message("lingyi", "CLI读取测试", "消息内容")
@@ -2157,7 +2157,7 @@ class TestLingMessageCLI:
         assert "CLI读取测试" in r.output
 
     def test_msg_read_cli_not_found(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -2165,7 +2165,7 @@ class TestLingMessageCLI:
         assert "不存在" in r.output
 
     def test_msg_reply_cli(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions
         init_store()
         send_message("lingyi", "CLI回复测试", "原始")
@@ -2178,7 +2178,7 @@ class TestLingMessageCLI:
         assert "回复已发送" in r.output
 
     def test_msg_discuss_cli(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
@@ -2187,7 +2187,7 @@ class TestLingMessageCLI:
         assert "发起" in r.output
 
     def test_msg_search_cli(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message
         init_store()
         send_message("lingyi", "搜索CLI测试", "知识闭环很重要")
@@ -2199,7 +2199,7 @@ class TestLingMessageCLI:
         assert "知识闭环" in r.output
 
     def test_msg_search_cli_empty(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store
         init_store()
         from click.testing import CliRunner
@@ -2209,7 +2209,7 @@ class TestLingMessageCLI:
         assert "未找到" in r.output
 
     def test_msg_close_cli(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from lingyi.lingmessage import init_store, send_message, list_discussions
         init_store()
         send_message("lingyi", "CLI关闭测试", "消息")
@@ -2222,7 +2222,7 @@ class TestLingMessageCLI:
         assert "已关闭" in r.output
 
     def test_msg_close_cli_not_found(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("lingyi.lingmessage._STORE_DIR", tmp_path / "lm")
+        monkeypatch.setattr("lingyi._lingmessage_models._STORE_DIR", tmp_path / "lm")
         from click.testing import CliRunner
         from lingyi.cli import cli
         runner = CliRunner()
