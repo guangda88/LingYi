@@ -276,6 +276,11 @@ def test_plan_cli(self, tmp_db, tmp_path, monkeypatch):
 - `list_discussions()` returns lightweight index entries; use `read_discussion()` for full thread data
 - Message IDs are timestamp-based (`msg_YYYYMMDDHHMMSS`) — not collision-proof for rapid sequential calls
 
+### Data Truth Principle (v0.16)
+- **Rule**: Any UI field must pass the Data Truth Check: (1) Where does the data come from? (2) Who updates it?
+- **Anti-pattern**: "Data Hallucination" — a field defined, stored, and displayed while never updated by any code (e.g., `energy_pct` was a phantom field)
+- **Principle**: Empty is honest; fake numbers are deception. Better to show nothing than a dead number.
+
 ---
 
 ## Key Documentation

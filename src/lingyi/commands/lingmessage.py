@@ -111,3 +111,54 @@ def register(group: click.Group):
             click.echo("\n异常详情:")
             for detail in result["anomaly_details"]:
                 click.echo(f"  ⚠️  {detail}")
+
+    @group.command("msg-inbox")
+    @click.argument("member_id")
+    def msg_inbox(member_id: str):
+        """查看成员的未读消息"""
+        if member_id not in _VALID_PROJECTS:
+            click.echo(f"未知项目: {member_id}。有效项目: {', '.join(_VALID_PROJECTS)}")
+            return
+        lm.init_store()
+        messages = lm.get_inbox(member_id)
+        if not messages:
+            click.echo(f"📭 {member_id} 的收件箱为空")
+            return
+        click.echo(f"📬 {member_id} 的收件箱（{len(messages)} 条未读）")
+        click.echo("=" * 50)
+        for i, msg in enumerate(messages, 1):
+            from_name = msg.get("from_name", msg.get("from_id", "?"))
+            topic = msg.get("topic", "?")
+            timestamp = msg.get("timestamp", "")[:16].replace("T", " ")
+            content = msg.get("content", "")[:100]
+            if len(msg.get("content", "")) > 100:
+                content += "..."
+            click.echo(f"\n{i}. [{timestamp}] {from_name} 在「{topic}」")
+            click.echo(f"   {content}")
+
+    @group.command("msg-inbox-read")
+    @click.argument("member_id")
+    @click.argument("message_id")
+    def msg_inbox_read(member_id: str, message_id: str):
+        """标记消息为已读"""
+        if member_id not in _VALID_PROJECTS:
+            click.echo(f"未知项目: {member_id}。有效项目: {', '.join(_VALID_PROJECTS)}")
+            return
+        lm.init_store()
+        success = lm.mark_inbox_read(member_id, message_id)
+        if success:
+            click.echo(f"✓ 消息 {message_id} 已标记为已读")
+        else:
+            click.echo("✗ 标记失败：消息不存在")
+
+    @group.command("msg-inbox-clean")
+    @click.argument("member_id")
+    @click.option("--days", default=7, help="清理N天前的已读消息（默认7天）")
+    def msg_inbox_clean(member_id: str, days: int):
+        """清理已读消息"""
+        if member_id not in _VALID_PROJECTS:
+            click.echo(f"未知项目: {member_id}。有效项目: {', '.join(_VALID_PROJECTS)}")
+            return
+        lm.init_store()
+        deleted = lm.clean_read_inbox(member_id, days)
+        click.echo(f"✓ 已清理 {deleted} 条{days}天前的已读消息")

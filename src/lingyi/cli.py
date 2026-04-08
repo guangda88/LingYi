@@ -16,9 +16,12 @@ from .commands import voice as voice_cmds
 from .commands import mobile as mobile_cmds
 from .commands import briefing as briefing_cmds
 from .commands import lingmessage as lingmessage_cmds
+from .commands import health as health_cmds
+from .commands import unified as unified_cmds
 from .commands import web as web_cmds
 from .commands import voicecall as voicecall_cmds
 from .commands import council as council_cmds
+from .commands import verification as verification_cmds
 
 
 @click.group()
@@ -78,9 +81,12 @@ mobile_cmds.register(cli)
 briefing_cmds.register(cli)
 briefing_cmds.register_daemon(cli)
 lingmessage_cmds.register(cli)
+health_cmds.register(cli)
+unified_cmds.register(cli)
 web_cmds.register(cli)
 voicecall_cmds.register(cli)
 council_cmds.register(cli)
+verification_cmds.register(cli)
 
 
 @cli.command("patrol")

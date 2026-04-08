@@ -101,6 +101,11 @@ def _ensure_store() -> Path:
     store = _get_store()
     store.mkdir(parents=True, exist_ok=True)
     (store / "discussions").mkdir(exist_ok=True)
+    (store / "inbox").mkdir(exist_ok=True)
+    # Create inbox directories for each member
+    for member_id in PROJECTS.keys():
+        member_inbox = store / "inbox" / member_id
+        member_inbox.mkdir(parents=True, exist_ok=True)
     return store
 
 
@@ -293,6 +298,9 @@ def send_message(from_id: str, topic: str, content: str,
         _save_discussion(store, disc_data)
         _update_index_entry(store, disc_data)
         disc_id = disc_data["id"]
+
+    # Also save to recipient inboxes
+    _save_to_inboxes(store, disc_id, msg, from_id)
 
     _ping_notify(from_id, disc_id, topic)
     return msg
@@ -487,6 +495,202 @@ def detect_temporal_anomalies(disc: dict, threshold_seconds: float = 2.0) -> lis
         prev_from = cur_from
 
     return anomalies
+
+
+def _save_to_inboxes(store: Path, disc_id: str, msg: Message, sender_id: str) -> list:
+    """保存消息到所有收件人的收件箱（除发送者外），返回通知成功列表。"""
+    inbox_entry = {
+        "discussion_id": disc_id,
+        "message_id": msg.id,
+        "topic": msg.topic,
+        "from_id": msg.from_id,
+        "from_name": msg.from_name,
+        "content": msg.content,
+        "timestamp": msg.timestamp,
+        "status": "sent",  # sent | notified | delivered | read | replied
+        "read": False,
+    }
+    
+    # 收件人列表：除发送者外的所有成员
+    recipient_ids = [mid for mid in PROJECTS.keys() if mid != sender_id]
+    
+    notified = []
+    for recipient_id in recipient_ids:
+        inbox_dir = store / "inbox" / recipient_id
+        inbox_file = inbox_dir / f"{msg.id}.json"
+        try:
+            inbox_file.write_text(json.dumps(inbox_entry, ensure_ascii=False, indent=2), encoding="utf-8")
+            
+            # 尝试通知（同步尝试，不阻塞）
+            try:
+                success = _notify_single(recipient_id, msg.from_id, disc_id, msg.topic)
+                if success:
+                    inbox_entry["status"] = "delivered"
+                    inbox_file.write_text(json.dumps(inbox_entry, ensure_ascii=False, indent=2), encoding="utf-8")
+                    notified.append(recipient_id)
+                else:
+                    inbox_entry["status"] = "notified"
+                    inbox_file.write_text(json.dumps(inbox_entry, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception:
+                # 通知失败，状态仍为sent
+                pass
+                
+        except Exception as e:
+            logger.warning(f"Failed to save to {recipient_id}'s inbox: {e}")
+    
+    return notified
+
+
+def _notify_single(recipient_id: str, from_id: str, disc_id: str, topic: str) -> bool:
+    """尝试通知单个成员，返回是否成功。"""
+    import urllib.request
+    import urllib.error
+    
+    # 端点映射（只通知支持lingmessage的成员）
+    _ENDPOINT_MAP = {
+        "lingflow": "http://127.0.0.1:8600/api/lingmessage/notify",
+        "lingzhi": "http://127.0.0.1:8000/api/v1/lingmessage/notify",
+        "lingyi": "https://127.0.0.1:8900/api/lingmessage/notify",
+        "lingclaude": "http://127.0.0.1:8700/api/lingmessage/notify",
+        "lingresearch": "http://127.0.0.1:8003/api/lingmessage/notify",
+        "lingminopt": "http://127.0.0.1:8002/api/lingmessage/notify",
+    }
+    
+    if recipient_id not in _ENDPOINT_MAP:
+        return False
+    
+    url = _ENDPOINT_MAP[recipient_id]
+    payload = json.dumps({
+        "event": "new_message",
+        "from": from_id,
+        "discussion_id": disc_id,
+        "topic": topic,
+        "timestamp": _now(),
+    }, ensure_ascii=False).encode("utf-8")
+    
+    try:
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        ctx = None
+        if url.startswith("https"):
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = 0
+        with urllib.request.urlopen(req, context=ctx, timeout=3) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def get_inbox(member_id: str) -> list:
+    """获取成员的未读消息列表。"""
+    store = _get_store()
+    if not store.exists():
+        return []
+    
+    inbox_dir = store / "inbox" / member_id
+    if not inbox_dir.exists():
+        return []
+    
+    messages = []
+    for msg_file in sorted(inbox_dir.glob("*.json")):
+        try:
+            data = json.loads(msg_file.read_text(encoding="utf-8"))
+            if not data.get("read", False):
+                messages.append(data)
+        except Exception:
+            continue
+    
+    # 按时间戳倒序排列
+    return sorted(messages, key=lambda m: m.get("timestamp", ""), reverse=True)
+
+
+def get_delivery_status(message_id: str) -> dict:
+    """获取消息的送达状态详情。"""
+    store = _get_store()
+    if not store.exists():
+        return {"error": "Store not found"}
+    
+    inbox_dir = store / "inbox"
+    if not inbox_dir.exists():
+        return {"error": "Inbox directory not found"}
+    
+    status = {"message_id": message_id, "recipients": {}}
+    
+    for member_inbox in inbox_dir.iterdir():
+        if not member_inbox.is_dir():
+            continue
+        
+        msg_file = member_inbox / f"{message_id}.json"
+        if msg_file.exists():
+            try:
+                data = json.loads(msg_file.read_text(encoding="utf-8"))
+                member_id = member_inbox.name
+                status["recipients"][member_id] = {
+                    "name": data.get("from_name", member_id),
+                    "status": data.get("status", "unknown"),
+                    "read": data.get("read", False),
+                    "timestamp": data.get("timestamp", ""),
+                }
+            except Exception:
+                continue
+    
+    return status
+
+
+def mark_inbox_read(member_id: str, message_id: str) -> bool:
+    """标记消息为已读，并返回是否成功。"""
+    store = _get_store()
+    inbox_dir = store / "inbox" / member_id
+    msg_file = inbox_dir / f"{message_id}.json"
+    
+    if not msg_file.exists():
+        return False
+    
+    try:
+        data = json.loads(msg_file.read_text(encoding="utf-8"))
+        data["read"] = True
+        data["status"] = "read"
+        msg_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to mark {message_id} as read: {e}")
+        return False
+
+
+def clean_read_inbox(member_id: str, days: int = 7) -> int:
+    """清理N天前的已读消息，返回删除的数量。"""
+    from datetime import datetime, timedelta
+    store = _get_store()
+    inbox_dir = store / "inbox" / member_id
+    
+    if not inbox_dir.exists():
+        return 0
+    
+    cutoff = datetime.now() - timedelta(days=days)
+    deleted = 0
+    
+    for msg_file in inbox_dir.glob("*.json"):
+        try:
+            data = json.loads(msg_file.read_text(encoding="utf-8"))
+            if data.get("read", False):
+                ts_str = data.get("timestamp", "")
+                if ts_str:
+                    try:
+                        ts = datetime.fromisoformat(ts_str)
+                        if ts < cutoff:
+                            msg_file.unlink()
+                            deleted += 1
+                    except ValueError:
+                        pass
+        except Exception:
+            continue
+    
+    return deleted
 
 
 def annotate_discussion(disc_id: str) -> dict:

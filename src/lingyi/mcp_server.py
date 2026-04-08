@@ -8,6 +8,7 @@
   P0新增: today_schedule, week_schedule, smart_remind, done_plan, week_plans,
           plan_stats, list_projects, save_session, last_session, search_knowledge,
           speak, synthesize_to_file, transcribe, council_scan, council_health
+  约束验证: verify_assertion, verification_stats, verification_log
 """
 
 from __future__ import annotations
@@ -31,6 +32,22 @@ def _to_dict(obj: Any) -> dict:
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         return dataclasses.asdict(obj)
     return obj
+
+
+# 初始化约束层
+_constraint_layer = None
+
+def _get_constraint_layer():
+    """获取约束层实例（延迟初始化）"""
+    global _constraint_layer
+    if _constraint_layer is None:
+        try:
+            from .constraint_layer import ConstraintLayer
+            _constraint_layer = ConstraintLayer()
+            logger.info("约束层已初始化")
+        except ImportError as e:
+            logger.warning(f"约束层初始化失败: {e}")
+    return _constraint_layer
 
 
 # ── 个人管理（6个工具） ──
@@ -167,9 +184,37 @@ def tool_digest_content(text: str) -> dict:
 @mcp.tool(name="ask_lingzhi", description="灵知问答（灵问）")
 def tool_ask_lingzhi(question: str, category: str = "") -> dict:
     """向灵知知识库提问。category 可选: 气功/儒家/佛家/道家/武术/哲学/科学/心理学。
-    医学诊断类查询将被拦截。"""
-    from .ask import ask_knowledge
+    医学诊断类查询将被拦截。
 
+    通过约束层验证，确保不违反医疗边界。"""
+    from .ask import ask_knowledge
+    from .constraint_layer import Assertion
+
+    constraint = _get_constraint_layer()
+    if constraint:
+        # 构造断言
+        assertion = Assertion(
+            member_id="lingzhi",
+            assertion_type="fact",
+            content=f"向灵知提问: {question}",
+            tool_call={
+                "name": "ask_lingzhi",
+                "arguments": {"question": question, "category": category}
+            }
+        )
+
+        # 验证断言
+        result = constraint.verify_assertion(assertion)
+
+        if not result.passed:
+            logger.warning(f"约束层拦截灵知提问: {result.reason}")
+            return {
+                "error": "约束层拦截",
+                "reason": result.reason,
+                "recommendation": result.recommendation
+            }
+
+    # 验证通过，执行查询
     result = ask_knowledge(
         question=question,
         category=category or None,
@@ -281,9 +326,37 @@ def tool_search_knowledge(
     top_k: int = 5,
 ) -> dict:
     """搜索灵知知识库，返回匹配文档列表。比 ask_lingzhi 更灵活。
-    医学诊断类查询将被拦截。"""
-    from .ask import search_knowledge
+    医学诊断类查询将被拦截。
 
+    通过约束层验证，确保不违反医疗边界和九域限制。"""
+    from .ask import search_knowledge
+    from .constraint_layer import Assertion
+
+    constraint = _get_constraint_layer()
+    if constraint:
+        # 构造断言
+        assertion = Assertion(
+            member_id="lingzhi",
+            assertion_type="fact",
+            content=f"搜索灵知知识库: {query}",
+            tool_call={
+                "name": "search_knowledge",
+                "arguments": {"query": query, "category": category, "top_k": top_k}
+            }
+        )
+
+        # 验证断言
+        result = constraint.verify_assertion(assertion)
+
+        if not result.passed:
+            logger.warning(f"约束层拦截灵知搜索: {result.reason}")
+            return {
+                "error": "约束层拦截",
+                "reason": result.reason,
+                "recommendation": result.recommendation
+            }
+
+    # 验证通过，执行搜索
     return search_knowledge(
         query=query,
         category=category or None,
@@ -331,6 +404,98 @@ def tool_council_health() -> dict:
     from .council import council_health
 
     return council_health()
+
+
+# ── 约束层验证（3个工具） ──
+
+
+@mcp.tool(name="verify_assertion", description="验证断言（灵验）")
+def tool_verify_assertion(
+    member_id: str,
+    assertion_type: str,
+    content: str,
+    tool_call: dict | None = None,
+) -> dict:
+    """验证AI成员的断言是否符合约束。
+
+    参数:
+        member_id: 成员ID (lingzhi/lingflow/lingresearch)
+        assertion_type: 断言类型 (fact/action/communication)
+        content: 断言内容
+        tool_call: 工具调用信息（可选）
+
+    返回验证结果，包括是否通过、失败原因和改进建议。"""
+    from .constraint_layer import Assertion
+
+    constraint = _get_constraint_layer()
+    if not constraint:
+        return {
+            "error": "约束层未初始化",
+            "passed": False
+        }
+
+    assertion = Assertion(
+        member_id=member_id,
+        assertion_type=assertion_type,
+        content=content,
+        tool_call=tool_call
+    )
+
+    result = constraint.verify_assertion(assertion)
+
+    return {
+        "passed": result.passed,
+        "reason": result.reason,
+        "checks": result.checks,
+        "recommendation": result.recommendation,
+        "requires_fallback": result.requires_fallback
+    }
+
+
+@mcp.tool(name="verification_stats", description="验证统计（灵统验）")
+def tool_verification_stats(days: int = 7) -> dict:
+    """获取验证统计信息。
+
+    参数:
+        days: 统计天数（默认7天）
+
+    返回包括总数、通过数、拒绝数、降级数和批准率。"""
+    constraint = _get_constraint_layer()
+    if not constraint:
+        return {
+            "error": "约束层未初始化"
+        }
+
+    return constraint.get_verification_stats(days)
+
+
+@mcp.tool(name="verification_log", description="验证日志（灵志）")
+def tool_verification_log(days: int = 7, member_id: str = "") -> list[dict]:
+    """获取验证日志。
+
+    参数:
+        days: 查询天数（默认7天）
+        member_id: 按成员ID筛选（可选）
+
+    返回验证日志列表。"""
+    from .constraint_layer import VerificationMonitor
+    from datetime import datetime
+
+    monitor = VerificationMonitor()
+    logs = monitor._load_logs()
+
+    # 筛选时间范围
+    cutoff = datetime.now().timestamp() - days * 86400
+    recent_logs = [
+        log for log in logs
+        if datetime.fromisoformat(log["timestamp"]).timestamp() > cutoff
+    ]
+
+    # 按成员ID筛选
+    if member_id:
+        recent_logs = [log for log in recent_logs if log["member_id"] == member_id]
+
+    return recent_logs
 
 
 def main():

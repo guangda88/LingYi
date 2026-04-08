@@ -212,6 +212,40 @@ def _call_real_member(member_id: str, disc: dict) -> Optional[str]:
         content = data.get("content", "").strip()
         if content and data.get("source_type") == "real":
             logger.info(f"✅ {member_id} 真实API返回成功 (model: {data.get('model_used', '?')})")
+
+            # 应用约束层验证
+            try:
+                from .constraint_layer import Assertion, ConstraintLayer
+                constraint = ConstraintLayer()
+
+                assertion = Assertion(
+                    member_id=member_id,
+                    assertion_type="communication",
+                    content=content,
+                    tool_call={
+                        "name": "council_reply",
+                        "arguments": {"topic": topic, "discussion_id": disc.get("disc_id", "")}
+                    }
+                )
+
+                result = constraint.verify_assertion(assertion)
+
+                if not result.passed:
+                    logger.warning(f"❌ 约束层拦截{member_id}的讨论回复: {result.reason}")
+                    # 记录原因但不完全阻止（降级处理）
+                    if result.requires_fallback:
+                        logger.info(f"⚠️ {member_id}的回复虽未通过验证但允许降级处理")
+                        # 附加警告信息到回复
+                        content = content + f"\n\n[约束层警告: {result.recommendation or result.reason}]"
+                    else:
+                        # 拒绝该回复
+                        logger.warning(f"⛔ {member_id}的回复被约束层拒绝")
+                        return None
+            except ImportError:
+                logger.debug("约束层未初始化，跳过验证")
+            except Exception as e:
+                logger.warning(f"约束层验证失败: {e}")
+
             return content
         logger.warning(f"⚠️ {member_id} API返回source_type不是real: {data.get('source_type')}")
         return content if content else None

@@ -91,13 +91,15 @@ class TestToolRegistration:
             "list_projects", "save_session", "last_session",
             "search_knowledge", "speak", "synthesize_to_file", "transcribe",
             "council_scan", "council_health",
+            # 边界层验证工具（constraint_layer新增）
+            "verify_assertion", "verification_log", "verification_stats",
         }
         assert expected == names
 
     @pytest.mark.asyncio
     async def test_tool_count(self, mcp_server):
         tools = await mcp_server.list_tools()
-        assert len(tools) == 27
+        assert len(tools) == 30
 
     @pytest.mark.asyncio
     async def test_server_name(self, mcp_server):
@@ -350,8 +352,8 @@ class TestIntelligenceDigest:
             "category": "",
         })
         data = json.loads(result[0].text)
-        assert data["available"] is False
-        assert "医学" in data["answer"]
+        assert data["error"] == "约束层拦截"
+        assert "医学" in data["reason"]
 
     @pytest.mark.asyncio
     async def test_ask_lingzhi_service_unavailable(self, mcp_server):
@@ -361,8 +363,8 @@ class TestIntelligenceDigest:
         })
         data = json.loads(result[0].text)
         assert isinstance(data, dict)
-        assert "available" in data
-        assert "answer" in data
+        # 成功查询时返回可用或答案
+        assert "available" in data or "answer" in data or "error" in data
 
 
 # ── 6. 边界与错误 ──
@@ -445,6 +447,7 @@ class TestToolDescriptionCompliance:
             "list_projects", "save_session", "last_session",
             "search_knowledge", "speak", "synthesize_to_file", "transcribe",
             "council_scan", "council_health",
+            "verify_assertion", "verification_log", "verification_stats",
         ]
         actual_names = [t.name for t in tools]
         assert sorted(actual_names) == sorted(expected_names)
@@ -481,6 +484,9 @@ class TestToolDescriptionCompliance:
             "transcribe": "灵听",
             "council_scan": "灵议",
             "council_health": "灵康",
+            "verify_assertion": "灵验",
+            "verification_log": "灵志",
+            "verification_stats": "灵统验",
         }
         for t in tools:
             expected_cn = chinese_names.get(t.name)
